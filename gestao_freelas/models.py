@@ -1,9 +1,11 @@
 from django.db import models
-
+from django.conf import settings
 # Create your models here.
 
 class Cliente(models.Model):
     '''Tabela de clientes'''
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clientes')
+    
     nome = models.CharField(max_length=100)
     email = models.EmailField(max_length=254, blank=True,null=True, unique=True) # Valida se o texto é valido
     telefone = models.CharField(max_length=15, blank=True, null=True, unique=True)
@@ -14,6 +16,8 @@ class Cliente(models.Model):
         
 class Servico(models.Model):
     '''Tabela de serviços'''
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='servicos')
+    
     nome = models.CharField(max_length=150)
     descricao = models.TextField(blank=True, null=True, max_length=500)
     
@@ -23,6 +27,8 @@ class Servico(models.Model):
     
 class Projeto(models.Model):
     '''Tabela associativa para clientes, serviços'''
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='projetos')
+    
     # Opções predefinidas para a periodicidade da cobrança
     cliente = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name='projetos')
     servico = models.ForeignKey(Servico, on_delete=models.CASCADE, related_name='projetos')
