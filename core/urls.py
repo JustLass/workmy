@@ -24,7 +24,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     # Conectando as rotas do app usuarios
-    path('usuarios/', include('usuarios.urls')),
+    path('', include('usuarios.urls')),
 ]
 
 
