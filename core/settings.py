@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     
     # Nossos apps
     'gestao_freelas',
+    'usuarios',
     
 ]
 
@@ -140,3 +141,16 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+
+# Configurações para ficheiros de media (Uploads dos utilizadores)
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Não se esqueça de avisar o Django de que este é o modelo oficial de utilizador!
+AUTH_USER_MODEL = 'usuarios.Usuario'
+
+# Redireciona para a página inicial após o login (vamos criar essa página depois)
+LOGIN_REDIRECT_URL = '/' 
+
+# Diz ao Django qual é o nome da rota de login caso um usuário deslogado tente acessar uma página bloqueada
+LOGIN_URL = 'login'
