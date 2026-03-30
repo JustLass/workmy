@@ -47,7 +47,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    # Third-party
+    'corsheaders',
+    'ninja_jwt',
+    
     # Nossos apps
+    'api',
     'gestao_freelas',
     'usuarios',
     
@@ -57,6 +62,8 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     # Meu middleware do whitenoise
     'whitenoise.middleware.WhiteNoiseMiddleware',
+    # CORS precisa vir antes do CommonMiddleware
+    'corsheaders.middleware.CorsMiddleware',
     # Django padrao
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -154,3 +161,28 @@ LOGIN_REDIRECT_URL = '/'
 
 # Diz ao Django qual é o nome da rota de login caso um usuário deslogado tente acessar uma página bloqueada
 LOGIN_URL = 'login'
+
+# CORS Configuration (para desenvolvimento local)
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:5173",  # Vite default port
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+]
+
+CORS_ALLOW_CREDENTIALS = True
+
+# Django Ninja JWT Settings
+from datetime import timedelta
+
+NINJA_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': True,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}

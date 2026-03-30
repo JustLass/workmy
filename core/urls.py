@@ -21,9 +21,16 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+# Importa a API do Ninja
+from api.api import api
+
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Conectando as rotas do app usuarios
+    
+    # API REST
+    path('api/', api.urls),
+    
+    # Rotas antigas (monolito) - manter por enquanto
     path('', include('usuarios.urls')),
 ]
 
