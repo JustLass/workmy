@@ -85,3 +85,8 @@ Thumbs.db
 # Keep frontend utility libs versioned
 !frontend/src/lib/
 !frontend/src/lib/*.ts
+
+# Hide local Copilot prompt packs
+.github/prompts/ui-ux-pro-max/
+
+.github/prompts/ui-ux-pro-max
