@@ -34,9 +34,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY', chave_padrao)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-# ALLOWED_HOSTS - usar variável de ambiente em produção
-# No Render: ALLOWED_HOSTS=seu-app.onrender.com,localhost
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+# ALLOWED_HOSTS - usa env sem quebrar desenvolvimento local
+_allowed_hosts_env = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+_local_hosts = ['localhost', '127.0.0.1']
+ALLOWED_HOSTS = list(dict.fromkeys(_allowed_hosts_env + _local_hosts))
 
 
 # Application definition
@@ -50,6 +51,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     
     # Third-party
+    'ninja',
     'corsheaders',
     'ninja_jwt',
     
@@ -193,9 +195,10 @@ NINJA_JWT = {
 }
 
 # Security Settings for Production
+ON_RENDER = os.environ.get('RENDER', '').lower() == 'true'
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = True
+    SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True' if ON_RENDER else 'False') == 'True'
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000
