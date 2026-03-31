@@ -81,3 +81,7 @@ Thumbs.db
 # IDE plugins
 .vscode/settings.json
 .vscode/extensions.json
+
+# Keep frontend utility libs versioned
+!frontend/src/lib/
+!frontend/src/lib/*.ts
