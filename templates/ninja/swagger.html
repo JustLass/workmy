@@ -26,6 +26,66 @@
             }
 
             const ui = window.ui;
+
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+            const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+
+            function forceSetEmpty(el, setter) {
+                setter.call(el, '');
+                el.defaultValue = '';
+                el.removeAttribute('value');
+                el.setAttribute('value', '');
+                el.dispatchEvent(new Event('input', { bubbles: true }));
+                el.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+
+            function clearDefaultStringValues() {
+                const textInputs = document.querySelectorAll('input[type="text"], input[type="password"], input[type="email"], input[type="search"], input:not([type])');
+                textInputs.forEach((input) => {
+                    const value = (input.value || '').trim().toLowerCase();
+                    const placeholder = (input.getAttribute('placeholder') || '').trim().toLowerCase();
+                    if (value === 'string' || value === 'string($date)' || value === 'string($date-time)' || value === 'string($email)') {
+                        forceSetEmpty(input, nativeInputValueSetter);
+                    }
+                    if (placeholder === 'string' || placeholder === 'string($date)' || placeholder === 'string($date-time)' || placeholder === 'string($email)') {
+                        input.setAttribute('placeholder', '');
+                    }
+                });
+                const textareas = document.querySelectorAll('textarea');
+                textareas.forEach((area) => {
+                    const value = (area.value || '').trim().toLowerCase();
+                    const isRequestBody = area.classList.contains('body-param__text') || !!area.closest('.body-param');
+                    if (isRequestBody) {
+                        forceSetEmpty(area, nativeTextAreaValueSetter);
+                    } else if (value === 'string') {
+                        forceSetEmpty(area, nativeTextAreaValueSetter);
+                    }
+                    const placeholder = (area.getAttribute('placeholder') || '').trim().toLowerCase();
+                    if (placeholder === 'string') {
+                        area.setAttribute('placeholder', '');
+                    }
+                });
+            }
+
+            const observer = new MutationObserver(() => clearDefaultStringValues());
+            observer.observe(document.body, { childList: true, subtree: true });
+            setTimeout(clearDefaultStringValues, 200);
+            setTimeout(clearDefaultStringValues, 800);
+            setTimeout(clearDefaultStringValues, 1500);
+            setTimeout(clearDefaultStringValues, 3000);
+            const clearIntervalId = setInterval(clearDefaultStringValues, 400);
+            setTimeout(() => clearInterval(clearIntervalId), 10000);
+
+            document.addEventListener('click', (event) => {
+                const el = event.target;
+                if (!(el instanceof Element)) return;
+                if (el.closest('.try-out__btn') || el.closest('.opblock-summary') || el.closest('.btn.execute')) {
+                    setTimeout(clearDefaultStringValues, 50);
+                    setTimeout(clearDefaultStringValues, 200);
+                    setTimeout(clearDefaultStringValues, 600);
+                }
+            });
+
             const originalFetch = window.fetch;
             window.fetch = async (...args) => {
                 const response = await originalFetch(...args);
