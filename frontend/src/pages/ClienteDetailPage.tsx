@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import type { Cliente, Pagamento, Projeto, Servico } from '../types'
+import type { Cliente, ClienteDetailResponse, Pagamento, Projeto, Servico } from '../types'
 import { ApiError } from '../lib/http'
 import { formatCurrency, formatDate } from '../lib/format'
 
@@ -16,6 +16,7 @@ export function ClienteDetailPage() {
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([])
   const [novoPagamento, setNovoPagamento] = useState({
+    projeto_id: '',
     valor: '',
     tipo_pagamento: 'MENSAL',
     data: '',
@@ -28,16 +29,15 @@ export function ClienteDetailPage() {
     if (!clienteId) return
     setError('')
     try {
-      const [clienteData, servicosData, projetosData, pagamentosData] = await Promise.all([
-        request<Cliente>(`/clientes/${clienteId}`),
-        request<Servico[]>('/servicos/'),
-        request<Projeto[]>('/projetos/'),
-        request<Pagamento[]>('/pagamentos/'),
-      ])
-      setCliente(clienteData)
-      setServicos(servicosData)
-      setProjetos(projetosData.filter((p) => p.cliente_id === clienteId))
-      setPagamentos(pagamentosData)
+      const detailData = await request<ClienteDetailResponse>(`/clientes/${clienteId}/detalhe`)
+      setCliente(detailData.cliente)
+      setServicos(detailData.servicos)
+      setProjetos(detailData.projetos)
+      setPagamentos(detailData.pagamentos)
+      setNovoPagamento((prev) => ({
+        ...prev,
+        projeto_id: prev.projeto_id || (detailData.projetos[0] ? String(detailData.projetos[0].id) : ''),
+      }))
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar detalhe do cliente')
     }
@@ -70,19 +70,29 @@ export function ClienteDetailPage() {
       setError('Vincule um serviço antes de adicionar pagamento.')
       return
     }
-    const projetoBase = projetos[0]
+    const projetoId = Number(novoPagamento.projeto_id)
+    if (!projetoId) {
+      setError('Selecione o serviço referente ao pagamento.')
+      return
+    }
     try {
       await request('/pagamentos/', {
         method: 'POST',
         body: {
-          projeto_id: projetoBase.id,
+          projeto_id: projetoId,
           valor: novoPagamento.valor,
           tipo_pagamento: novoPagamento.tipo_pagamento,
           data: novoPagamento.data,
           observacao: novoPagamento.observacao,
         },
       })
-      setNovoPagamento({ valor: '', tipo_pagamento: 'MENSAL', data: '', observacao: '' })
+      setNovoPagamento((prev) => ({
+        ...prev,
+        valor: '',
+        tipo_pagamento: 'MENSAL',
+        data: '',
+        observacao: '',
+      }))
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao adicionar pagamento')
@@ -187,6 +197,22 @@ export function ClienteDetailPage() {
       <article className="card">
         <h3>Adicionar pagamento</h3>
         <div className="form-grid">
+          <label>
+            Serviço
+            <select
+              value={novoPagamento.projeto_id}
+              onChange={(e) =>
+                setNovoPagamento((prev) => ({ ...prev, projeto_id: e.target.value }))
+              }
+            >
+              <option value="">Selecione o serviço</option>
+              {projetos.map((projeto) => (
+                <option key={projeto.id} value={projeto.id}>
+                  {projeto.servico_nome}
+                </option>
+              ))}
+            </select>
+          </label>
           <label>
             Valor
             <input

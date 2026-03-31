@@ -13,6 +13,7 @@ router = Router(tags=["Pagamentos"], auth=AuthBearer())
 class ListPagamentosQuerySchema(Schema):
     """Schema de filtros para listagem de pagamentos"""
     projeto_id: Optional[int] = None
+    cliente_id: Optional[int] = None
 
 
 @router.get("/", response=List[PagamentoOutSchema], summary="Listar todos os pagamentos")
@@ -37,6 +38,8 @@ def list_pagamentos(request, filtros: ListPagamentosQuerySchema = Query(...)):
     
     if filtros.projeto_id:
         pagamentos = pagamentos.filter(projeto_id=filtros.projeto_id)
+    if filtros.cliente_id:
+        pagamentos = pagamentos.filter(projeto__cliente_id=filtros.cliente_id)
     
     return [
         {

@@ -3,7 +3,7 @@ Schemas Pydantic para os modelos de negócio
 """
 from ninja import Schema
 from pydantic import Field, ConfigDict, field_validator
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 from datetime import date
 from decimal import Decimal
 import re
@@ -138,6 +138,14 @@ class PagamentoOutSchema(Schema):
     tipo_pagamento_display: str = Field(..., description="Tipo do pagamento legível")
     data: str = Field(..., description="Data do pagamento")
     observacao: Optional[str] = Field(None, description="Observação")
+
+
+class ClienteDetailOutSchema(Schema):
+    """Schema de resposta completa para tela de detalhe do cliente"""
+    cliente: ClienteOutSchema
+    servicos: List[ServicoOutSchema]
+    projetos: List[ProjetoOutSchema]
+    pagamentos: List[PagamentoOutSchema]
 
 
 # ============ SCHEMAS DE ERRO ============

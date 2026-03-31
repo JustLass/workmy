@@ -61,3 +61,10 @@ export type DashboardMensal = {
     quantidade_pagamentos: number
   }>
 }
+
+export type ClienteDetailResponse = {
+  cliente: Cliente
+  servicos: Servico[]
+  projetos: Projeto[]
+  pagamentos: Pagamento[]
+}

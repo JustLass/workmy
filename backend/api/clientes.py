@@ -4,8 +4,14 @@ Router CRUD para Clientes
 from ninja import Router, Form
 from typing import List
 from django.shortcuts import get_object_or_404
-from gestao_freelas.models import Cliente
-from api.schemas import ClienteInSchema, ClienteOutSchema, ErrorSchema, MessageSchema
+from gestao_freelas.models import Cliente, Servico, Projeto, Pagamento
+from api.schemas import (
+    ClienteInSchema,
+    ClienteOutSchema,
+    ClienteDetailOutSchema,
+    ErrorSchema,
+    MessageSchema,
+)
 from api.auth import AuthBearer
 
 router = Router(tags=["Clientes"], auth=AuthBearer())
@@ -51,6 +57,77 @@ def get_cliente(request, cliente_id: int):
         }
     except Cliente.DoesNotExist:
         return 404, {"detail": "Cliente não encontrado"}
+
+
+@router.get(
+    "/{cliente_id}/detalhe",
+    response={200: ClienteDetailOutSchema, 404: ErrorSchema},
+    summary="Buscar detalhe completo do cliente",
+)
+def get_cliente_detalhe(request, cliente_id: int):
+    """
+    Retorna dados completos para a tela de detalhe do cliente em uma única requisição.
+    """
+    try:
+        cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
+    except Cliente.DoesNotExist:
+        return 404, {"detail": "Cliente não encontrado"}
+
+    servicos = Servico.objects.filter(usuario=request.auth).order_by("-criado_em")
+    projetos = (
+        Projeto.objects.filter(usuario=request.auth, cliente_id=cliente_id)
+        .select_related("cliente", "servico")
+        .order_by("-criado_em")
+    )
+    pagamentos = (
+        Pagamento.objects.filter(projeto__usuario=request.auth, projeto__cliente_id=cliente_id)
+        .select_related("projeto", "projeto__cliente", "projeto__servico")
+        .order_by("-data")
+    )
+
+    return 200, {
+        "cliente": {
+            "id": cliente.id,
+            "nome": cliente.nome,
+            "email": cliente.email,
+            "telefone": cliente.telefone,
+            "criado_em": cliente.criado_em.isoformat(),
+        },
+        "servicos": [
+            {
+                "id": s.id,
+                "nome": s.nome,
+                "descricao": s.descricao,
+                "criado_em": s.criado_em.isoformat(),
+            }
+            for s in servicos
+        ],
+        "projetos": [
+            {
+                "id": p.id,
+                "cliente_id": p.cliente.id,
+                "cliente_nome": p.cliente.nome,
+                "servico_id": p.servico.id,
+                "servico_nome": p.servico.nome,
+                "criado_em": p.criado_em.isoformat(),
+            }
+            for p in projetos
+        ],
+        "pagamentos": [
+            {
+                "id": pag.id,
+                "projeto_id": pag.projeto.id,
+                "projeto_cliente_nome": pag.projeto.cliente.nome,
+                "projeto_servico_nome": pag.projeto.servico.nome,
+                "valor": str(pag.valor),
+                "tipo_pagamento": pag.tipo_pagamento,
+                "tipo_pagamento_display": pag.get_tipo_pagamento_display(),
+                "data": pag.data.isoformat(),
+                "observacao": pag.observacao,
+            }
+            for pag in pagamentos
+        ],
+    }
 
 
 @router.post("/", response={201: ClienteOutSchema, 400: ErrorSchema}, summary="Criar novo cliente")

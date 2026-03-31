@@ -1,8 +1,8 @@
 """
 Router CRUD para Projetos
 """
-from ninja import Router, Form
-from typing import List
+from ninja import Router, Form, Query, Schema
+from typing import List, Optional
 from gestao_freelas.models import Projeto, Cliente, Servico
 from api.schemas import ProjetoInSchema, ProjetoOutSchema, ErrorSchema, MessageSchema
 from api.auth import AuthBearer
@@ -10,14 +10,21 @@ from api.auth import AuthBearer
 router = Router(tags=["Projetos"], auth=AuthBearer())
 
 
+class ListProjetosQuerySchema(Schema):
+    """Schema de filtros para listagem de projetos"""
+    cliente_id: Optional[int] = None
+
+
 @router.get("/", response=List[ProjetoOutSchema], summary="Listar todos os projetos")
-def list_projetos(request):
+def list_projetos(request, filtros: ListProjetosQuerySchema = Query(...)):
     """
     Lista todos os projetos do usuário autenticado com informações de cliente e serviço.
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
     projetos = Projeto.objects.filter(usuario=request.auth).select_related('cliente', 'servico').order_by('-criado_em')
+    if filtros.cliente_id:
+        projetos = projetos.filter(cliente_id=filtros.cliente_id)
     return [
         {
             "id": p.id,

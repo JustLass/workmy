@@ -13,6 +13,7 @@ Base: `/api/`
 
 - `GET /clientes/`
 - `GET /clientes/{id}`
+- `GET /clientes/{id}/detalhe` (cliente + serviços + projetos + pagamentos em 1 requisição)
 - `POST /clientes/`
 - `PUT /clientes/{id}`
 - `DELETE /clientes/{id}`
@@ -28,6 +29,7 @@ Base: `/api/`
 ## Projetos
 
 - `GET /projetos/`
+- `GET /projetos/?cliente_id={id}` (filtro opcional por cliente)
 - `GET /projetos/{id}`
 - `POST /projetos/`
 - `PUT /projetos/{id}`
@@ -36,6 +38,8 @@ Base: `/api/`
 ## Pagamentos
 
 - `GET /pagamentos/`
+- `GET /pagamentos/?projeto_id={id}` (filtro opcional por projeto)
+- `GET /pagamentos/?cliente_id={id}` (filtro opcional por cliente)
 - `GET /pagamentos/{id}`
 - `POST /pagamentos/`
 - `PUT /pagamentos/{id}`
