@@ -8,6 +8,7 @@
 - [Segurança](SECURITY.md)
 - [Deploy](DEPLOY.md)
 - [Testes](TESTING.md)
+- [Integração Vercel + Render](VERCEL_RENDER_INTEGRATION.md)
 
 ## Acesso rápido
 

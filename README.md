@@ -57,6 +57,7 @@ python manage.py runserver
 - 🚀 **[Deploy Guide](docs/DEPLOY.md)** - Fluxo de deploy
 - 🧪 **[Testing Guide](docs/TESTING.md)** - Testes e validações
 - 🔒 **[Security Guide](docs/SECURITY.md)** - Hardening aplicado
+- 🔗 **[Vercel + Render](docs/VERCEL_RENDER_INTEGRATION.md)** - Integração front/back
 
 ---
 
