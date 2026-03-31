@@ -68,3 +68,9 @@ export type ClienteDetailResponse = {
   projetos: Projeto[]
   pagamentos: Pagamento[]
 }
+
+export type ServicoDetailResponse = {
+  servico: Servico
+  projetos: Projeto[]
+  clientes: Cliente[]
+}

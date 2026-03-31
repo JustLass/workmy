@@ -148,6 +148,13 @@ class ClienteDetailOutSchema(Schema):
     pagamentos: List[PagamentoOutSchema]
 
 
+class ServicoDetailOutSchema(Schema):
+    """Schema de resposta completa para tela de detalhe do serviço"""
+    servico: ServicoOutSchema
+    projetos: List[ProjetoOutSchema]
+    clientes: List[ClienteOutSchema]
+
+
 # ============ SCHEMAS DE ERRO ============
 
 class ErrorSchema(Schema):

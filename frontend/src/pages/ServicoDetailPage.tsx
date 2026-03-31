@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import type { Cliente, Projeto, Servico } from '../types'
+import type { Cliente, Servico, ServicoDetailResponse } from '../types'
 import { ApiError } from '../lib/http'
 
 export function ServicoDetailPage() {
@@ -11,7 +11,6 @@ export function ServicoDetailPage() {
   const servicoId = Number(id)
 
   const [servico, setServico] = useState<Servico | null>(null)
-  const [projetos, setProjetos] = useState<Projeto[]>([])
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [error, setError] = useState('')
 
@@ -19,14 +18,11 @@ export function ServicoDetailPage() {
     if (!servicoId) return
     setError('')
     try {
-      const [servicoData, projetosData, clientesData] = await Promise.all([
-        request<Servico>(`/servicos/${servicoId}`),
-        request<Projeto[]>('/projetos/'),
-        request<Cliente[]>('/clientes/'),
-      ])
-      setServico(servicoData)
-      setProjetos(projetosData.filter((p) => p.servico_id === servicoId))
-      setClientes(clientesData)
+      const detailData = await request<ServicoDetailResponse>(`/servicos/${servicoId}/detalhe`, {
+        cacheTtlMs: 180_000,
+      })
+      setServico(detailData.servico)
+      setClientes(detailData.clientes)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar detalhe do serviço')
     }
@@ -39,9 +35,7 @@ export function ServicoDetailPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const clientesVinculados = clientes.filter((cliente) =>
-    projetos.some((projeto) => projeto.cliente_id === cliente.id),
-  )
+  const clientesVinculados = clientes
 
   return (
     <section className="page">

@@ -29,7 +29,9 @@ export function ClienteDetailPage() {
     if (!clienteId) return
     setError('')
     try {
-      const detailData = await request<ClienteDetailResponse>(`/clientes/${clienteId}/detalhe`)
+      const detailData = await request<ClienteDetailResponse>(`/clientes/${clienteId}/detalhe`, {
+        cacheTtlMs: 180_000,
+      })
       setCliente(detailData.cliente)
       setServicos(detailData.servicos)
       setProjetos(detailData.projetos)

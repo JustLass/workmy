@@ -3,8 +3,8 @@ Router CRUD para Serviços
 """
 from ninja import Router, Form
 from typing import List
-from gestao_freelas.models import Servico
-from api.schemas import ServicoInSchema, ServicoOutSchema, ErrorSchema, MessageSchema
+from gestao_freelas.models import Servico, Projeto, Cliente
+from api.schemas import ServicoInSchema, ServicoOutSchema, ServicoDetailOutSchema, ErrorSchema, MessageSchema
 from api.auth import AuthBearer
 
 router = Router(tags=["Serviços"], auth=AuthBearer())
@@ -48,6 +48,59 @@ def get_servico(request, servico_id: int):
         }
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado"}
+
+
+@router.get(
+    "/{servico_id}/detalhe",
+    response={200: ServicoDetailOutSchema, 404: ErrorSchema},
+    summary="Buscar detalhe completo do serviço",
+)
+def get_servico_detalhe(request, servico_id: int):
+    """
+    Retorna dados completos para a tela de detalhe do serviço em uma única requisição.
+    """
+    try:
+        servico = Servico.objects.get(id=servico_id, usuario=request.auth)
+    except Servico.DoesNotExist:
+        return 404, {"detail": "Serviço não encontrado"}
+
+    projetos = (
+        Projeto.objects.filter(usuario=request.auth, servico_id=servico_id)
+        .select_related("cliente", "servico")
+        .order_by("-criado_em")
+    )
+    clientes_ids = [projeto.cliente_id for projeto in projetos]
+    clientes = Cliente.objects.filter(usuario=request.auth, id__in=clientes_ids).order_by("-criado_em")
+
+    return 200, {
+        "servico": {
+            "id": servico.id,
+            "nome": servico.nome,
+            "descricao": servico.descricao,
+            "criado_em": servico.criado_em.isoformat(),
+        },
+        "projetos": [
+            {
+                "id": projeto.id,
+                "cliente_id": projeto.cliente.id,
+                "cliente_nome": projeto.cliente.nome,
+                "servico_id": projeto.servico.id,
+                "servico_nome": projeto.servico.nome,
+                "criado_em": projeto.criado_em.isoformat(),
+            }
+            for projeto in projetos
+        ],
+        "clientes": [
+            {
+                "id": cliente.id,
+                "nome": cliente.nome,
+                "email": cliente.email,
+                "telefone": cliente.telefone,
+                "criado_em": cliente.criado_em.isoformat(),
+            }
+            for cliente in clientes
+        ],
+    }
 
 
 @router.post("/", response={201: ServicoOutSchema}, summary="Criar novo serviço")

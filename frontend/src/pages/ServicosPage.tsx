@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import type { Servico } from '../types'
+import type { Servico, ServicoDetailResponse } from '../types'
 import { ApiError } from '../lib/http'
 
 export function ServicosPage() {
@@ -25,6 +25,19 @@ export function ServicosPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!items.length) return
+    const warmup = window.setTimeout(() => {
+      const topItems = items.slice(0, 5)
+      topItems.forEach((item) => {
+        void request<ServicoDetailResponse>(`/servicos/${item.id}/detalhe`, { cacheTtlMs: 180_000 }).catch(
+          () => undefined,
+        )
+      })
+    }, 0)
+    return () => window.clearTimeout(warmup)
+  }, [items, request])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()

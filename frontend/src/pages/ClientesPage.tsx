@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import type { Cliente } from '../types'
+import type { Cliente, ClienteDetailResponse } from '../types'
 import { ApiError } from '../lib/http'
 
 export function ClientesPage() {
@@ -26,6 +26,19 @@ export function ClientesPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (!items.length) return
+    const warmup = window.setTimeout(() => {
+      const topItems = items.slice(0, 5)
+      topItems.forEach((item) => {
+        void request<ClienteDetailResponse>(`/clientes/${item.id}/detalhe`, { cacheTtlMs: 180_000 }).catch(
+          () => undefined,
+        )
+      })
+    }, 0)
+    return () => window.clearTimeout(warmup)
+  }, [items, request])
 
   const telefoneFormatado = useMemo(() => {
     const ddd = form.ddd.replace(/\D/g, '').slice(0, 2)

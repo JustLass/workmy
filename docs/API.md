@@ -22,6 +22,7 @@ Base: `/api/`
 
 - `GET /servicos/`
 - `GET /servicos/{id}`
+- `GET /servicos/{id}/detalhe` (serviço + projetos + clientes em 1 requisição)
 - `POST /servicos/`
 - `PUT /servicos/{id}`
 - `DELETE /servicos/{id}`
