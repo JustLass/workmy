@@ -59,6 +59,7 @@ class ClienteOutSchema(Schema):
     nome: str = Field(..., description="Nome do cliente")
     email: Optional[str] = Field(None, description="Email do cliente")
     telefone: Optional[str] = Field(None, description="Telefone do cliente")
+    total_acumulado: str = Field(..., description="Total acumulado em pagamentos do cliente")
     criado_em: str = Field(..., description="Data de criação")
 
 

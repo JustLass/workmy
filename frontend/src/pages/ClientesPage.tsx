@@ -4,12 +4,15 @@ import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { Cliente } from '../types'
 import { ApiError } from '../lib/http'
+import { formatCurrency } from '../lib/format'
 
 export function ClientesPage() {
   const { request } = useApi()
   const [items, setItems] = useState<Cliente[]>([])
   const [form, setForm] = useState({ nome: '', email: '', ddd: '', telefone_numero: '' })
   const [search, setSearch] = useState('')
+  const [sortBy, setSortBy] = useState<'nome' | 'total'>('nome')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -79,14 +82,25 @@ export function ClientesPage() {
 
   const filteredItems = useMemo(() => {
     const term = search.trim().toLowerCase()
-    if (!term) return items
-    return items.filter((item) =>
+    const base = !term
+      ? items
+      : items.filter((item) =>
       [item.nome, item.email ?? '', item.telefone ?? '']
         .join(' ')
         .toLowerCase()
         .includes(term),
-    )
-  }, [items, search])
+      )
+    const sorted = [...base].sort((a, b) => {
+      if (sortBy === 'nome') {
+        const cmp = a.nome.localeCompare(b.nome, 'pt-BR')
+        return sortDir === 'asc' ? cmp : -cmp
+      }
+      const totalA = Number(a.total_acumulado || 0)
+      const totalB = Number(b.total_acumulado || 0)
+      return sortDir === 'asc' ? totalA - totalB : totalB - totalA
+    })
+    return sorted
+  }, [items, search, sortBy, sortDir])
 
   return (
     <section className="page">
@@ -148,15 +162,31 @@ export function ClientesPage() {
       {error && <p className="error">{error}</p>}
 
       <article className="card">
-        <label className="field">
-          Buscar cliente
-          <input
-            type="search"
-            placeholder="Digite nome, email ou telefone"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </label>
+        <div className="form-grid">
+          <label className="field">
+            Buscar cliente
+            <input
+              type="search"
+              placeholder="Digite nome, email ou telefone"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </label>
+          <label className="field">
+            Ordenar por
+            <select value={sortBy} onChange={(e) => setSortBy(e.target.value as 'nome' | 'total')}>
+              <option value="nome">Nome</option>
+              <option value="total">Total acumulado</option>
+            </select>
+          </label>
+          <label className="field">
+            Direção
+            <select value={sortDir} onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')}>
+              <option value="asc">Crescente</option>
+              <option value="desc">Decrescente</option>
+            </select>
+          </label>
+        </div>
       </article>
 
       <article className="card">
@@ -166,6 +196,7 @@ export function ClientesPage() {
               <th>Nome</th>
               <th>Email</th>
               <th>Telefone</th>
+              <th>Total acumulado</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -175,6 +206,7 @@ export function ClientesPage() {
                 <td>{item.nome}</td>
                 <td>{item.email || '-'}</td>
                 <td>{item.telefone || '-'}</td>
+                <td>{formatCurrency(item.total_acumulado)}</td>
                 <td className="table-action">
                   <div className="inline-actions">
                     <Link

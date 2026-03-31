@@ -4,6 +4,8 @@ Router CRUD para Clientes
 from ninja import Router, Form
 from typing import List
 from django.shortcuts import get_object_or_404
+from django.db.models import Sum
+from django.db.models.functions import Coalesce
 from gestao_freelas.models import Cliente, Servico, Projeto, Pagamento
 from api.schemas import (
     ClienteInSchema,
@@ -24,13 +26,18 @@ def list_clientes(request):
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
-    clientes = Cliente.objects.filter(usuario=request.auth).order_by('-criado_em')
+    clientes = (
+        Cliente.objects.filter(usuario=request.auth)
+        .annotate(total_acumulado=Coalesce(Sum("projetos__pagamentos__valor"), 0))
+        .order_by('-criado_em')
+    )
     return [
         {
             "id": c.id,
             "nome": c.nome,
             "email": c.email,
             "telefone": c.telefone,
+            "total_acumulado": str(c.total_acumulado),
             "criado_em": c.criado_em.isoformat()
         }
         for c in clientes
@@ -53,6 +60,11 @@ def get_cliente(request, cliente_id: int):
             "nome": cliente.nome,
             "email": cliente.email,
             "telefone": cliente.telefone,
+            "total_acumulado": str(
+                Pagamento.objects.filter(projeto__cliente=cliente).aggregate(
+                    total=Coalesce(Sum("valor"), 0)
+                )["total"]
+            ),
             "criado_em": cliente.criado_em.isoformat()
         }
     except Cliente.DoesNotExist:
@@ -91,6 +103,9 @@ def get_cliente_detalhe(request, cliente_id: int):
             "nome": cliente.nome,
             "email": cliente.email,
             "telefone": cliente.telefone,
+            "total_acumulado": str(
+                pagamentos.aggregate(total=Coalesce(Sum("valor"), 0))["total"]
+            ),
             "criado_em": cliente.criado_em.isoformat(),
         },
         "servicos": [
@@ -153,6 +168,7 @@ def create_cliente(request, payload: Form[ClienteInSchema]):
         "nome": cliente.nome,
         "email": cliente.email,
         "telefone": cliente.telefone,
+        "total_acumulado": "0",
         "criado_em": cliente.criado_em.isoformat()
     }
 
@@ -184,6 +200,11 @@ def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
         "nome": cliente.nome,
         "email": cliente.email,
         "telefone": cliente.telefone,
+        "total_acumulado": str(
+            Pagamento.objects.filter(projeto__cliente=cliente).aggregate(
+                total=Coalesce(Sum("valor"), 0)
+            )["total"]
+        ),
         "criado_em": cliente.criado_em.isoformat()
     }
 

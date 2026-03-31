@@ -16,6 +16,7 @@ export type Cliente = {
   nome: string
   email?: string | null
   telefone?: string | null
+  total_acumulado: string
   criado_em: string
 }
 

@@ -18,6 +18,9 @@ Base: `/api/`
 - `PUT /clientes/{id}`
 - `DELETE /clientes/{id}`
 
+Campo adicional em respostas de cliente:
+- `total_acumulado`: soma dos pagamentos vinculados ao cliente.
+
 ## Serviços
 
 - `GET /servicos/`

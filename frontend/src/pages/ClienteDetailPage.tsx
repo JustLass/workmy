@@ -14,7 +14,7 @@ export function ClienteDetailPage() {
   const stateClienteNome = (location.state as { clienteNome?: string } | null)?.clienteNome
 
   const [cliente, setCliente] = useState<Cliente | null>(
-    stateClienteNome ? { id: clienteId, nome: stateClienteNome, criado_em: '' } : null,
+    stateClienteNome ? { id: clienteId, nome: stateClienteNome, total_acumulado: '0', criado_em: '' } : null,
   )
   const [servicos, setServicos] = useState<Servico[]>([])
   const [projetos, setProjetos] = useState<Projeto[]>([])
