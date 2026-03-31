@@ -68,6 +68,7 @@ export function ClienteDetailPage() {
   }
 
   const onAdicionarPagamento = async () => {
+    setError('')
     if (!projetos.length) {
       setError('Vincule um serviço antes de adicionar pagamento.')
       return
@@ -77,12 +78,26 @@ export function ClienteDetailPage() {
       setError('Selecione o serviço referente ao pagamento.')
       return
     }
+    const valorNormalizado = novoPagamento.valor.trim().replace(',', '.')
+    if (!valorNormalizado) {
+      setError('Informe o valor do pagamento.')
+      return
+    }
+    const valorNumerico = Number(valorNormalizado)
+    if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+      setError('Valor inválido. Informe um número maior que zero.')
+      return
+    }
+    if (!novoPagamento.data) {
+      setError('Informe a data do pagamento.')
+      return
+    }
     try {
       await request('/pagamentos/', {
         method: 'POST',
         body: {
           projeto_id: projetoId,
-          valor: novoPagamento.valor,
+          valor: valorNormalizado,
           tipo_pagamento: novoPagamento.tipo_pagamento,
           data: novoPagamento.data,
           observacao: novoPagamento.observacao,
