@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import make_password
 from ninja_jwt.tokens import RefreshToken
 from typing import Optional
-from pydantic import Field
+from pydantic import Field, ConfigDict
 
 User = get_user_model()
 
@@ -16,16 +16,36 @@ router = Router(tags=["Auth"])
 
 class UserRegisterSchema(Schema):
     """Schema para registro de novo usuário"""
-    username: str = Field(..., min_length=3, max_length=150, description="Nome de usuário único", example="joao_silva")
-    email: str = Field(..., description="Email do usuário (deve ser único)", example="joao@example.com")
-    password: str = Field(..., min_length=6, description="Senha (mínimo 6 caracteres)", example="senha123")
-    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do usuário (opcional)", example="+55 11 98765-4321")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "username": "joao_silva",
+                "email": "joao@example.com",
+                "password": "senha123",
+                "telefone": "+55 11 98765-4321"
+            }
+        }
+    )
+    
+    username: str = Field(..., min_length=3, max_length=150, description="Nome de usuário único")
+    email: str = Field(..., description="Email do usuário (deve ser único)")
+    password: str = Field(..., min_length=6, description="Senha (mínimo 6 caracteres)")
+    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do usuário (opcional)")
 
 
 class UserLoginSchema(Schema):
     """Schema para login de usuário"""
-    username: str = Field(..., description="Nome de usuário", example="joao_silva")
-    password: str = Field(..., description="Senha do usuário", example="senha123")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "username": "joao_silva",
+                "password": "senha123"
+            }
+        }
+    )
+    
+    username: str = Field(..., description="Nome de usuário")
+    password: str = Field(..., description="Senha do usuário")
 
 
 class UserOutSchema(Schema):
@@ -46,7 +66,15 @@ class TokenResponseSchema(Schema):
 
 class RefreshTokenSchema(Schema):
     """Schema para renovação de token"""
-    refresh: str = Field(..., description="Token de refresh JWT", example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            }
+        }
+    )
+    
+    refresh: str = Field(..., description="Token de refresh JWT")
 
 
 class AccessTokenSchema(Schema):
