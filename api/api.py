@@ -4,6 +4,10 @@ Configuração do Django Ninja
 """
 from ninja import NinjaAPI
 from api.auth import router as auth_router
+from api.clientes import router as clientes_router
+from api.servicos import router as servicos_router
+from api.projetos import router as projetos_router
+from api.pagamentos import router as pagamentos_router
 
 # Cria a API principal
 api = NinjaAPI(
@@ -15,4 +19,8 @@ api = NinjaAPI(
 # Adiciona router de autenticação
 api.add_router("/auth/", router=auth_router)
 
-# TODO: Adicionar routers de clientes, servicos, projetos, pagamentos
+# Adiciona routers de CRUD
+api.add_router("/clientes/", router=clientes_router)
+api.add_router("/servicos/", router=servicos_router)
+api.add_router("/projetos/", router=projetos_router)
+api.add_router("/pagamentos/", router=pagamentos_router)
