@@ -1,5 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../hooks/useAuth'
+import { useEffect } from 'react'
+import { API_BASE_URL } from '../config'
 
 const navItems = [
   { to: '/dashboard', label: 'Dashboard' },
@@ -10,6 +12,20 @@ const navItems = [
 
 export function AppLayout() {
   const { user, logout } = useAuth()
+
+  useEffect(() => {
+    if (!user) return
+
+    const ping = () => {
+      void fetch(`${API_BASE_URL}/health/ping`, {
+        method: 'GET',
+      })
+    }
+
+    ping()
+    const intervalId = window.setInterval(ping, 14 * 60 * 1000)
+    return () => window.clearInterval(intervalId)
+  }, [user])
 
   return (
     <div className="app-shell">
