@@ -10,6 +10,7 @@ export function PagamentosPage() {
   const [items, setItems] = useState<Pagamento[]>([])
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [editingValor, setEditingValor] = useState('')
   const [form, setForm] = useState({
     projeto_id: '',
     valor: '',
@@ -19,8 +20,6 @@ export function PagamentosPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const editingItem = items.find((item) => item.id === editingId) ?? null
-  const editingCode = editingItem ? `PG-${editingItem.id}-PRJ-${editingItem.projeto_id}` : ''
 
   const load = useCallback(async () => {
     setError('')
@@ -49,17 +48,10 @@ export function PagamentosPage() {
         ...form,
         projeto_id: Number(form.projeto_id),
       }
-      if (editingId) {
-        await request(`/pagamentos/${editingId}`, {
-          method: 'PUT',
-          body: payload,
-        })
-      } else {
-        await request('/pagamentos/', {
-          method: 'POST',
-          body: payload,
-        })
-      }
+      await request('/pagamentos/', {
+        method: 'POST',
+        body: payload,
+      })
       setForm({
         projeto_id: '',
         valor: '',
@@ -67,7 +59,6 @@ export function PagamentosPage() {
         data: '',
         observacao: '',
       })
-      setEditingId(null)
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao salvar pagamento')
@@ -78,25 +69,38 @@ export function PagamentosPage() {
 
   const onEdit = (item: Pagamento) => {
     setEditingId(item.id)
-    setForm({
-      projeto_id: String(item.projeto_id),
-      valor: item.valor,
-      tipo_pagamento: item.tipo_pagamento,
-      data: item.data,
-      observacao: item.observacao ?? '',
-    })
+    setEditingValor(item.valor)
     setError('')
   }
 
   const onCancelEdit = () => {
     setEditingId(null)
-    setForm({
-      projeto_id: '',
-      valor: '',
-      tipo_pagamento: 'MENSAL',
-      data: '',
-      observacao: '',
-    })
+    setEditingValor('')
+  }
+
+  const onSaveInlineValue = async (item: Pagamento) => {
+    const valorNormalizado = editingValor.trim().replace(',', '.')
+    const valorNumerico = Number(valorNormalizado)
+    if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+      setError('Valor inválido. Informe um número maior que zero.')
+      return
+    }
+    try {
+      await request(`/pagamentos/${item.id}`, {
+        method: 'PUT',
+        body: {
+          projeto_id: item.projeto_id,
+          valor: valorNormalizado,
+          tipo_pagamento: item.tipo_pagamento,
+          data: item.data,
+          observacao: item.observacao ?? '',
+        },
+      })
+      onCancelEdit()
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar pagamento')
+    }
   }
 
   const onDelete = async (id: number) => {
@@ -118,12 +122,6 @@ export function PagamentosPage() {
       </header>
 
       <form className="card form-grid" onSubmit={onSubmit}>
-        {editingId ? (
-          <label>
-            ID do pagamento (usado na atualização)
-            <input value={editingCode} disabled />
-          </label>
-        ) : null}
         <label>
           Projeto
           <select
@@ -182,13 +180,8 @@ export function PagamentosPage() {
         </label>
 
         <button className="btn" type="submit" disabled={loading}>
-          {loading ? 'Salvando...' : editingId ? 'Atualizar pagamento' : 'Adicionar pagamento'}
+          {loading ? 'Salvando...' : 'Adicionar pagamento'}
         </button>
-        {editingId ? (
-          <button className="btn btn-secondary" type="button" onClick={onCancelEdit}>
-            Cancelar edição
-          </button>
-        ) : null}
       </form>
 
       {error && <p className="error">{error}</p>}
@@ -214,16 +207,75 @@ export function PagamentosPage() {
                   {item.projeto_cliente_nome} - {item.projeto_servico_nome}
                 </td>
                 <td>{item.tipo_pagamento}</td>
-                <td>{formatCurrency(item.valor)}</td>
+                <td>
+                  {editingId === item.id ? (
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={editingValor}
+                      onChange={(e) => setEditingValor(e.target.value)}
+                    />
+                  ) : (
+                    formatCurrency(item.valor)
+                  )}
+                </td>
                 <td>{formatDate(item.data)}</td>
                 <td>{formatDate(item.atualizado_em)}</td>
-                <td>
-                  <button className="btn btn-secondary" onClick={() => onEdit(item)}>
-                    Editar #{item.id}
-                  </button>
-                  <button className="btn btn-danger" onClick={() => void onDelete(item.id)}>
-                    Excluir
-                  </button>
+                <td className="table-action">
+                  <div className="inline-actions">
+                    {editingId === item.id ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-open icon-btn"
+                          onClick={() => void onSaveInlineValue(item)}
+                          aria-label={`Salvar pagamento ${item.id}`}
+                          title={`Salvar pagamento ${item.id}`}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M20 6 9 17l-5-5 1.4-1.4L9 14.2 18.6 4.6 20 6Z" fill="currentColor" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary icon-btn"
+                          onClick={onCancelEdit}
+                          aria-label={`Cancelar edição pagamento ${item.id}`}
+                          title={`Cancelar edição pagamento ${item.id}`}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m18.3 5.7-1.4-1.4L12 9.2 7.1 4.3 5.7 5.7 10.6 10.6 5.7 15.5l1.4 1.4 4.9-4.9 4.9 4.9 1.4-1.4-4.9-4.9 4.9-4.9Z" fill="currentColor" />
+                          </svg>
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="btn btn-open icon-btn"
+                          onClick={() => onEdit(item)}
+                          aria-label={`Editar pagamento ${item.id}`}
+                          title={`Editar pagamento ${item.id}`}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m3 17.2 11.6-11.6 3.8 3.8L6.8 21H3v-3.8Zm14.6-13 1.8-1.8a1 1 0 0 1 1.4 0l.9.9a1 1 0 0 1 0 1.4l-1.8 1.8-2.3-2.3Z" fill="currentColor" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn-delete icon-btn"
+                          onClick={() => void onDelete(item.id)}
+                          aria-label={`Excluir pagamento ${item.id}`}
+                          title={`Excluir pagamento ${item.id}`}
+                        >
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 6h2v9h-2V9Zm4 0h2v9h-2V9ZM7 9h2v9H7V9Z" fill="currentColor" />
+                          </svg>
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
