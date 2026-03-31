@@ -38,19 +38,19 @@
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }
 
-            function isRequestField(el) {
-                return !!el.closest('.opblock-body');
-            }
-
             function isEditableInput(input) {
                 const t = (input.getAttribute('type') || 'text').toLowerCase();
                 return !['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'hidden'].includes(t);
             }
 
+            function isSwaggerField(el) {
+                return !!el.closest('#swagger-ui, .swagger-ui');
+            }
+
             function clearDefaultStringValues() {
                 const textInputs = document.querySelectorAll('input');
                 textInputs.forEach((input) => {
-                    if (!isEditableInput(input) || !isRequestField(input)) return;
+                    if (!isEditableInput(input) || !isSwaggerField(input)) return;
                     const value = (input.value || '').trim().toLowerCase();
                     const defaultValue = (input.defaultValue || '').trim().toLowerCase();
                     const placeholder = (input.getAttribute('placeholder') || '').trim().toLowerCase();
@@ -69,7 +69,7 @@
 
                 const textareas = document.querySelectorAll('textarea');
                 textareas.forEach((area) => {
-                    if (!isRequestField(area)) return;
+                    if (!isSwaggerField(area)) return;
                     const value = (area.value || '').trim().toLowerCase();
                     const defaultValue = (area.defaultValue || '').trim().toLowerCase();
                     const placeholder = (area.getAttribute('placeholder') || '').trim().toLowerCase();
@@ -101,12 +101,9 @@
                 const el = event.target;
                 if (!(el instanceof Element)) return;
                 if (el.closest('.try-out__btn') || el.closest('.opblock-summary') || el.closest('.btn.execute')) {
-                    const opblock = el.closest('.opblock');
-                    if (opblock) {
-                        opblock.querySelectorAll('input, textarea').forEach((field) => {
-                            field.dataset.userTyped = '';
-                        });
-                    }
+                    document.querySelectorAll('#swagger-ui input, #swagger-ui textarea, .swagger-ui input, .swagger-ui textarea').forEach((field) => {
+                        field.dataset.userTyped = '';
+                    });
                     setTimeout(clearDefaultStringValues, 50);
                     setTimeout(clearDefaultStringValues, 200);
                     setTimeout(clearDefaultStringValues, 600);
@@ -116,7 +113,7 @@
             document.addEventListener('input', (event) => {
                 const el = event.target;
                 if (!(el instanceof Element)) return;
-                if ((el.matches('input') || el.matches('textarea')) && isRequestField(el)) {
+                if ((el.matches('input') || el.matches('textarea')) && isSwaggerField(el)) {
                     if ((el.value || '').trim() !== '') {
                         el.dataset.userTyped = '1';
                     }
