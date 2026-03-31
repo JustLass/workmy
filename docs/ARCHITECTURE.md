@@ -21,3 +21,18 @@
 3. Endpoint valida schema e autenticação.
 4. Regra de negócio executa via ORM.
 5. Resposta serializada por schema de saída.
+
+## Estratégia de performance (frontend + API)
+
+- API com endpoints agregados para detalhe:
+  - `/api/clientes/{id}/detalhe`
+  - `/api/servicos/{id}/detalhe`
+- API com filtros para reduzir consultas e payload:
+  - `/api/projetos/?cliente_id={id}`
+  - `/api/pagamentos/?cliente_id={id}` e `?projeto_id={id}`
+- Frontend com cache em `localStorage` por usuário logado:
+  - cache de GET persistente até invalidação explícita
+  - invalidação automática após escritas (POST/PUT/DELETE)
+- Bootstrap obrigatório no frontend:
+  - carrega clientes e serviços antes de liberar as rotas protegidas
+  - exibe animação de carregamento durante o preload.
