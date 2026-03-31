@@ -17,134 +17,83 @@
     <div id="swagger-ui"></div>
 
     <script src="{% static 'ninja/swagger-ui-bundle.js' %}"></script>
-    <script src="{% static 'ninja/swagger-ui-init.js' %}"></script>
     <script>
-        (function waitForSwagger() {
-            if (!window.ui) {
-                setTimeout(waitForSwagger, 100);
-                return;
+        const configJson = document.getElementById("swagger-settings").textContent;
+        const configObject = JSON.parse(configJson);
+
+        configObject.dom_id = "#swagger-ui";
+        configObject.presets = [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+        ];
+
+        configObject.requestInterceptor = (req) => {
+            {% if add_csrf %}
+            req.headers['X-CSRFToken'] = "{{csrf_token}}";
+            {% endif %}
+            if (req.url.endsWith('/api/auth/login') && req.method === 'POST') {
+                req.headers['Content-Type'] = 'application/x-www-form-urlencoded';
             }
+            return req;
+        };
 
-            const ui = window.ui;
-
-            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-            const nativeTextAreaValueSetter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
-
-            function forceSetEmpty(el, setter) {
-                setter.call(el, '');
-                el.defaultValue = '';
-                el.removeAttribute('value');
-                el.dispatchEvent(new Event('input', { bubbles: true }));
-                el.dispatchEvent(new Event('change', { bubbles: true }));
-            }
-
-            function isEditableInput(input) {
-                const t = (input.getAttribute('type') || 'text').toLowerCase();
-                return !['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'hidden'].includes(t);
-            }
-
-            function isSwaggerField(el) {
-                return !!el.closest('#swagger-ui, .swagger-ui');
-            }
-
-            function clearDefaultStringValues() {
-                const textInputs = document.querySelectorAll('input');
-                textInputs.forEach((input) => {
-                    if (!isEditableInput(input) || !isSwaggerField(input)) return;
-                    const value = (input.value || '').trim().toLowerCase();
-                    const defaultValue = (input.defaultValue || '').trim().toLowerCase();
-                    const placeholder = (input.getAttribute('placeholder') || '').trim().toLowerCase();
-                    const hasAutoValue = (
-                        value !== '' ||
-                        defaultValue !== '' ||
-                        placeholder.startsWith('string')
-                    );
-                    if (hasAutoValue && !input.dataset.userTyped) {
-                        forceSetEmpty(input, nativeInputValueSetter);
-                    }
-                    if (placeholder.startsWith('string')) {
-                        input.setAttribute('placeholder', '');
-                    }
-                });
-
-                const textareas = document.querySelectorAll('textarea');
-                textareas.forEach((area) => {
-                    if (!isSwaggerField(area)) return;
-                    const value = (area.value || '').trim().toLowerCase();
-                    const defaultValue = (area.defaultValue || '').trim().toLowerCase();
-                    const placeholder = (area.getAttribute('placeholder') || '').trim().toLowerCase();
-                    const isRequestBody = area.classList.contains('body-param__text') || !!area.closest('.body-param');
-                    const hasAutoValue = (
-                        isRequestBody ||
-                        value !== '' ||
-                        defaultValue !== '' ||
-                        placeholder.startsWith('string')
-                    );
-                    if (hasAutoValue && !area.dataset.userTyped) {
-                        forceSetEmpty(area, nativeTextAreaValueSetter);
-                    }
-                    if (placeholder.startsWith('string')) {
-                        area.setAttribute('placeholder', '');
-                    }
-                });
-            }
-
-            const observer = new MutationObserver(() => clearDefaultStringValues());
-            observer.observe(document.body, { childList: true, subtree: true });
-            setTimeout(clearDefaultStringValues, 200);
-            setTimeout(clearDefaultStringValues, 800);
-            setTimeout(clearDefaultStringValues, 1500);
-            setTimeout(clearDefaultStringValues, 3000);
-            setInterval(clearDefaultStringValues, 400);
-
-            document.addEventListener('click', (event) => {
-                const el = event.target;
-                if (!(el instanceof Element)) return;
-                if (el.closest('.try-out__btn') || el.closest('.opblock-summary') || el.closest('.btn.execute')) {
-                    document.querySelectorAll('#swagger-ui input, #swagger-ui textarea, .swagger-ui input, .swagger-ui textarea').forEach((field) => {
-                        field.dataset.userTyped = '';
-                    });
-                    setTimeout(clearDefaultStringValues, 50);
-                    setTimeout(clearDefaultStringValues, 200);
-                    setTimeout(clearDefaultStringValues, 600);
-                }
-            });
-
-            document.addEventListener('input', (event) => {
-                const el = event.target;
-                if (!(el instanceof Element)) return;
-                if ((el.matches('input') || el.matches('textarea')) && isSwaggerField(el)) {
-                    if ((el.value || '').trim() !== '') {
-                        el.dataset.userTyped = '1';
-                    }
-                }
-            });
-
-            const originalFetch = window.fetch;
-            window.fetch = async (...args) => {
-                const response = await originalFetch(...args);
+        configObject.responseInterceptor = (res) => {
+            if (res && res.url && res.url.includes('openapi.json')) {
                 try {
-                    const req = args[0];
-                    const url = typeof req === "string" ? req : req.url;
-                    if (url.endsWith('/api/auth/login') && response.ok) {
-                        const cloned = response.clone();
-                        const data = await cloned.json();
-                        if (data && data.access) {
-                            ui.authActions.authorize({
-                                AuthBearer: {
-                                    name: "AuthBearer",
-                                    schema: { type: "http", scheme: "bearer" },
-                                    value: data.access
-                                }
-                            });
+                    const specObj = typeof res.obj === 'object'
+                        ? res.obj
+                        : JSON.parse(res.text || res.data || '{}');
+
+                    const injectEmptyExamples = (node) => {
+                        if (Array.isArray(node)) {
+                            node.forEach(injectEmptyExamples);
+                            return;
                         }
-                    }
+                        if (!node || typeof node !== 'object') return;
+                        if (node.type === 'string' && node.example === undefined && node.examples === undefined) {
+                            node.example = '';
+                        }
+                        Object.keys(node).forEach((key) => injectEmptyExamples(node[key]));
+                    };
+
+                    injectEmptyExamples(specObj);
+                    const serialized = JSON.stringify(specObj);
+                    res.obj = specObj;
+                    res.data = serialized;
+                    res.text = serialized;
                 } catch (e) {
-                    // Não interrompe o fluxo da UI se falhar parse
+                    console.error('Erro ao ajustar exemplos do Swagger:', e);
                 }
-                return response;
-            };
-        })();
+            }
+            return res;
+        };
+
+        const ui = SwaggerUIBundle(configObject);
+
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            try {
+                const req = args[0];
+                const url = typeof req === "string" ? req : req.url;
+                if (url.endsWith('/api/auth/login') && response.ok) {
+                    const cloned = response.clone();
+                    const data = await cloned.json();
+                    if (data && data.access) {
+                        ui.authActions.authorize({
+                            AuthBearer: {
+                                name: "AuthBearer",
+                                schema: { type: "http", scheme: "bearer" },
+                                value: data.access
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                // Não interrompe o fluxo da UI se falhar parse
+            }
+            return response;
+        };
     </script>
 
 </body>
