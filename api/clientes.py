@@ -59,19 +59,11 @@ def create_cliente(request, payload: ClienteInSchema):
     Cria um novo cliente para o usuário autenticado.
     
     - **nome**: Nome do cliente (obrigatório)
-    - **email**: Email do cliente (opcional, mas deve ser único se fornecido)
-    - **telefone**: Telefone do cliente (opcional, mas deve ser único se fornecido)
+    - **email**: Email do cliente (opcional, pode se repetir)
+    - **telefone**: Telefone do cliente (opcional, validado no padrão brasileiro)
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
-    # Verifica email único (se fornecido)
-    if payload.email and Cliente.objects.filter(email=payload.email).exists():
-        return 400, {"detail": "Email já está em uso"}
-    
-    # Verifica telefone único (se fornecido)
-    if payload.telefone and Cliente.objects.filter(telefone=payload.telefone).exists():
-        return 400, {"detail": "Telefone já está em uso"}
-    
     cliente = Cliente.objects.create(
         usuario=request.auth,
         nome=payload.nome,
@@ -104,16 +96,6 @@ def update_cliente(request, cliente_id: int, payload: ClienteInSchema):
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
     except Cliente.DoesNotExist:
         return 404, {"detail": "Cliente não encontrado"}
-    
-    # Verifica email único (se mudou e foi fornecido)
-    if payload.email and payload.email != cliente.email:
-        if Cliente.objects.filter(email=payload.email).exists():
-            return 400, {"detail": "Email já está em uso"}
-    
-    # Verifica telefone único (se mudou e foi fornecido)
-    if payload.telefone and payload.telefone != cliente.telefone:
-        if Cliente.objects.filter(telefone=payload.telefone).exists():
-            return 400, {"detail": "Telefone já está em uso"}
     
     cliente.nome = payload.nome
     cliente.email = payload.email

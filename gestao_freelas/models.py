@@ -7,8 +7,8 @@ class Cliente(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clientes')
     
     nome = models.CharField(max_length=100)
-    email = models.EmailField(max_length=254, blank=True,null=True, unique=True) # Valida se o texto é valido
-    telefone = models.CharField(max_length=15, blank=True, null=True, unique=True)
+    email = models.EmailField(max_length=254, blank=True, null=True)
+    telefone = models.CharField(max_length=20, blank=True, null=True)
     
     criado_em = models.DateTimeField(auto_now_add=True)
     def __str__(self):
