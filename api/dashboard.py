@@ -1,7 +1,7 @@
 """
 Router para Dashboard e Relatórios
 """
-from ninja import Router, Schema
+from ninja import Router, Schema, Query
 from typing import Optional
 from datetime import datetime, date
 from decimal import Decimal
@@ -48,12 +48,17 @@ class DashboardMensalSchema(Schema):
     por_cliente: list = Field(..., description="Detalhamento por cliente")
 
 
+class DashboardMensalQuerySchema(Schema):
+    """Schema de filtros para dashboard mensal"""
+    mes: Optional[int] = Field(None, ge=1, le=12, description="Mês do relatório (1-12)")
+    ano: Optional[int] = Field(None, ge=2000, description="Ano do relatório")
+    cliente_id: Optional[int] = Field(None, ge=1, description="ID do cliente para filtro")
+
+
 @router.get("/mensal", response={200: DashboardMensalSchema, 400: ErrorSchema}, summary="Dashboard mensal")
 def dashboard_mensal(
     request,
-    mes: Optional[int] = None,
-    ano: Optional[int] = None,
-    cliente_id: Optional[int] = None
+    filtros: DashboardMensalQuerySchema = Query(...)
 ):
     """
     Retorna dashboard mensal com totais de pagamentos.
@@ -72,8 +77,8 @@ def dashboard_mensal(
     """
     # Usa mês/ano atual se não especificado
     hoje = date.today()
-    mes = mes or hoje.month
-    ano = ano or hoje.year
+    mes = filtros.mes or hoje.month
+    ano = filtros.ano or hoje.year
     
     # Valida mês
     if mes < 1 or mes > 12:
@@ -90,12 +95,12 @@ def dashboard_mensal(
     ).select_related('projeto', 'projeto__cliente')
     
     # Filtra por cliente se especificado
-    if cliente_id:
+    if filtros.cliente_id:
         # Verifica se cliente pertence ao usuário
-        if not Cliente.objects.filter(id=cliente_id, usuario=request.auth).exists():
+        if not Cliente.objects.filter(id=filtros.cliente_id, usuario=request.auth).exists():
             return 400, {"detail": "Cliente não encontrado ou não pertence a você"}
         
-        pagamentos_query = pagamentos_query.filter(projeto__cliente_id=cliente_id)
+        pagamentos_query = pagamentos_query.filter(projeto__cliente_id=filtros.cliente_id)
     
     # Calcula totais
     agregados = pagamentos_query.aggregate(

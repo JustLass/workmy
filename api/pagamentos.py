@@ -1,7 +1,7 @@
 """
 Router CRUD para Pagamentos
 """
-from ninja import Router
+from ninja import Router, Query, Schema, Form
 from typing import List, Optional
 from gestao_freelas.models import Pagamento, Projeto
 from api.schemas import PagamentoInSchema, PagamentoOutSchema, ErrorSchema, MessageSchema
@@ -10,8 +10,13 @@ from api.auth import AuthBearer
 router = Router(tags=["Pagamentos"], auth=AuthBearer())
 
 
+class ListPagamentosQuerySchema(Schema):
+    """Schema de filtros para listagem de pagamentos"""
+    projeto_id: Optional[int] = None
+
+
 @router.get("/", response=List[PagamentoOutSchema], summary="Listar todos os pagamentos")
-def list_pagamentos(request, projeto_id: Optional[int] = None):
+def list_pagamentos(request, filtros: ListPagamentosQuerySchema = Query(...)):
     """
     Lista todos os pagamentos do usuário autenticado.
     
@@ -30,8 +35,8 @@ def list_pagamentos(request, projeto_id: Optional[int] = None):
         'projeto__servico'
     ).order_by('-data')
     
-    if projeto_id:
-        pagamentos = pagamentos.filter(projeto_id=projeto_id)
+    if filtros.projeto_id:
+        pagamentos = pagamentos.filter(projeto_id=filtros.projeto_id)
     
     return [
         {
@@ -84,7 +89,7 @@ def get_pagamento(request, pagamento_id: int):
 
 
 @router.post("/", response={201: PagamentoOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Criar novo pagamento")
-def create_pagamento(request, payload: PagamentoInSchema):
+def create_pagamento(request, payload: Form[PagamentoInSchema]):
     """
     Cria um novo pagamento para um projeto.
     
@@ -131,7 +136,7 @@ def create_pagamento(request, payload: PagamentoInSchema):
 
 
 @router.put("/{pagamento_id}", response={200: PagamentoOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar pagamento")
-def update_pagamento(request, pagamento_id: int, payload: PagamentoInSchema):
+def update_pagamento(request, pagamento_id: int, payload: Form[PagamentoInSchema]):
     """
     Atualiza um pagamento existente do usuário autenticado.
     

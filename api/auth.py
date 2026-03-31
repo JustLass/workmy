@@ -1,11 +1,12 @@
 """
 Schemas e endpoints de autenticação
 """
-from ninja import Router, Schema
+from ninja import Router, Schema, Form
 from ninja.security import HttpBearer
 from django.contrib.auth import get_user_model, authenticate
 from django.contrib.auth.hashers import make_password
 from ninja_jwt.tokens import RefreshToken
+from django_ratelimit.decorators import ratelimit
 from typing import Optional
 from pydantic import Field, ConfigDict
 
@@ -27,10 +28,34 @@ class UserRegisterSchema(Schema):
         }
     )
     
-    username: str = Field(..., min_length=3, max_length=150, description="Nome de usuário único")
-    email: str = Field(..., description="Email do usuário (deve ser único)")
-    password: str = Field(..., min_length=6, description="Senha (mínimo 6 caracteres)")
-    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do usuário (opcional)")
+    username: str = Field(
+        ...,
+        min_length=3,
+        max_length=150,
+        description="Nome de usuário único",
+        title="Nome de usuário",
+        examples=["joao_silva"]
+    )
+    email: str = Field(
+        ...,
+        description="Email do usuário (deve ser único)",
+        title="Email",
+        examples=["joao@example.com"]
+    )
+    password: str = Field(
+        ...,
+        min_length=6,
+        description="Senha (mínimo 6 caracteres)",
+        title="Senha",
+        examples=["senha123"]
+    )
+    telefone: Optional[str] = Field(
+        None,
+        max_length=20,
+        description="Telefone do usuário (opcional)",
+        title="Telefone",
+        examples=["(11) 98765-4321"]
+    )
 
 
 class UserLoginSchema(Schema):
@@ -44,8 +69,8 @@ class UserLoginSchema(Schema):
         }
     )
     
-    username: str = Field(..., description="Nome de usuário")
-    password: str = Field(..., description="Senha do usuário")
+    username: str = Field(..., description="Nome de usuário", title="Nome de usuário", examples=["joao_silva"])
+    password: str = Field(..., description="Senha do usuário", title="Senha", examples=["senha123"])
 
 
 class UserOutSchema(Schema):
@@ -54,7 +79,6 @@ class UserOutSchema(Schema):
     username: str = Field(..., description="Nome de usuário")
     email: str = Field(..., description="Email do usuário")
     telefone: Optional[str] = Field(None, description="Telefone do usuário")
-    foto_perfil: Optional[str] = Field(None, description="URL da foto de perfil")
 
 
 class TokenResponseSchema(Schema):
@@ -74,7 +98,7 @@ class RefreshTokenSchema(Schema):
         }
     )
     
-    refresh: str = Field(..., description="Token de refresh JWT")
+    refresh: str = Field(..., description="Token de refresh JWT", examples=["cole-seu-refresh-token-aqui"])
 
 
 class AccessTokenSchema(Schema):
@@ -87,8 +111,13 @@ class ErrorSchema(Schema):
     detail: str = Field(..., description="Mensagem de erro")
 
 
+def _rate_limit_exceeded_response():
+    return 429, {"detail": "Rate limit exceeded. Try again later."}
+
+
 @router.post("/register", response={200: TokenResponseSchema, 400: ErrorSchema}, summary="Registrar novo usuário")
-def register(request, payload: UserRegisterSchema):
+@ratelimit(key='ip', rate='3/h', method='POST', block=False)
+def register(request, payload: Form[UserRegisterSchema]):
     """
     Registra um novo usuário no sistema.
     
@@ -99,6 +128,9 @@ def register(request, payload: UserRegisterSchema):
     
     Retorna tokens JWT (access + refresh) e dados do usuário criado.
     """
+    if getattr(request, "limited", False):
+        return _rate_limit_exceeded_response()
+
     # Verifica se username já existe
     if User.objects.filter(username=payload.username).exists():
         return 400, {"detail": "Username já existe"}
@@ -125,14 +157,14 @@ def register(request, payload: UserRegisterSchema):
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "telefone": user.telefone,
-            "foto_perfil": user.foto_perfil.url if user.foto_perfil else None
+            "telefone": user.telefone
         }
     }
 
 
 @router.post("/login", response={200: TokenResponseSchema, 401: ErrorSchema}, summary="Login de usuário")
-def login(request, payload: UserLoginSchema):
+@ratelimit(key='ip', rate='5/m', method='POST', block=False)
+def login(request, payload: Form[UserLoginSchema]):
     """
     Autentica um usuário e retorna tokens JWT.
     
@@ -141,6 +173,9 @@ def login(request, payload: UserLoginSchema):
     
     Retorna tokens JWT (access + refresh) e dados do usuário autenticado.
     """
+    if getattr(request, "limited", False):
+        return _rate_limit_exceeded_response()
+
     user = authenticate(username=payload.username, password=payload.password)
     
     if user is None:
@@ -156,14 +191,14 @@ def login(request, payload: UserLoginSchema):
             "id": user.id,
             "username": user.username,
             "email": user.email,
-            "telefone": user.telefone,
-            "foto_perfil": user.foto_perfil.url if user.foto_perfil else None
+            "telefone": user.telefone
         }
     }
 
 
 @router.post("/refresh", response={200: AccessTokenSchema, 401: ErrorSchema}, summary="Renovar access token")
-def refresh_token(request, payload: RefreshTokenSchema):
+@ratelimit(key='ip', rate='10/m', method='POST', block=False)
+def refresh_token(request, payload: Form[RefreshTokenSchema]):
     """
     Renova o access token usando o refresh token.
     
@@ -172,6 +207,9 @@ def refresh_token(request, payload: RefreshTokenSchema):
     Retorna um novo access token (validade: 1 hora).
     Use este endpoint quando o access token expirar.
     """
+    if getattr(request, "limited", False):
+        return _rate_limit_exceeded_response()
+
     try:
         refresh = RefreshToken(payload.refresh)
         return 200, {"access": str(refresh.access_token)}
@@ -207,7 +245,6 @@ def me(request):
         "id": user.id,
         "username": user.username,
         "email": user.email,
-        "telefone": user.telefone,
-        "foto_perfil": user.foto_perfil.url if user.foto_perfil else None
+        "telefone": user.telefone
     }
 

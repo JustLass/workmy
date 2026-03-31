@@ -3,7 +3,7 @@ Schemas Pydantic para os modelos de negócio
 """
 from ninja import Schema
 from pydantic import Field, ConfigDict, field_validator
-from typing import Optional
+from typing import Optional, Literal
 from datetime import date
 from decimal import Decimal
 import re
@@ -23,9 +23,9 @@ class ClienteInSchema(Schema):
         }
     )
     
-    nome: str = Field(..., min_length=1, max_length=100, description="Nome do cliente")
-    email: Optional[str] = Field(None, max_length=254, description="Email do cliente (opcional)")
-    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do cliente (opcional)")
+    nome: str = Field(..., min_length=1, max_length=100, description="Nome do cliente", title="Nome", examples=["João Silva"])
+    email: Optional[str] = Field(None, max_length=254, description="Email do cliente (opcional)", title="Email", examples=["joao.silva@example.com"])
+    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do cliente (opcional)", title="Telefone", examples=["(11) 98765-4321"])
 
     @field_validator("telefone")
     @classmethod
@@ -83,8 +83,8 @@ class ServicoInSchema(Schema):
         }
     )
     
-    nome: str = Field(..., min_length=1, max_length=150, description="Nome do serviço")
-    descricao: Optional[str] = Field(None, max_length=500, description="Descrição do serviço (opcional)")
+    nome: str = Field(..., min_length=1, max_length=150, description="Nome do serviço", title="Nome", examples=["Desenvolvimento Web"])
+    descricao: Optional[str] = Field(None, max_length=500, description="Descrição do serviço (opcional)", title="Descrição", examples=["Criação de sites e aplicações web responsivas"])
 
 
 class ServicoOutSchema(Schema):
@@ -108,8 +108,8 @@ class ProjetoInSchema(Schema):
         }
     )
     
-    cliente_id: int = Field(..., description="ID do cliente")
-    servico_id: int = Field(..., description="ID do serviço")
+    cliente_id: int = Field(..., description="ID do cliente", title="ID do cliente", examples=[1])
+    servico_id: int = Field(..., description="ID do serviço", title="ID do serviço", examples=[1])
 
 
 class ProjetoOutSchema(Schema):
@@ -138,11 +138,16 @@ class PagamentoInSchema(Schema):
         }
     )
     
-    projeto_id: int = Field(..., description="ID do projeto")
-    valor: Decimal = Field(..., gt=0, description="Valor do pagamento")
-    tipo_pagamento: str = Field(..., description="Tipo: MENSAL ou AVULSO")
-    data: date = Field(..., description="Data do pagamento ou vencimento")
-    observacao: Optional[str] = Field(None, max_length=500, description="Observação (opcional)")
+    projeto_id: int = Field(..., description="ID do projeto", title="ID do projeto", examples=[1])
+    valor: Decimal = Field(..., gt=0, description="Valor do pagamento", title="Valor", examples=["1500.00"])
+    tipo_pagamento: Literal["MENSAL", "AVULSO"] = Field(
+        ...,
+        description="Tipo do pagamento: MENSAL ou AVULSO",
+        title="Tipo de pagamento",
+        examples=["MENSAL"]
+    )
+    data: date = Field(..., description="Data do pagamento ou vencimento", title="Data", examples=["2026-04-01"])
+    observacao: Optional[str] = Field(None, max_length=500, description="Observação (opcional)", title="Observação", examples=["Pagamento referente ao mês de março"])
 
 
 class PagamentoOutSchema(Schema):

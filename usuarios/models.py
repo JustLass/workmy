@@ -9,9 +9,6 @@ class Usuario(AbstractUser):
     email = models.EmailField('endereço de email', unique=True)
     
     telefone = models.CharField(max_length=20, blank=True, null=True)
-    
-    # As imagens serão guardadas na pasta media/perfil/
-    foto_perfil = models.ImageField(upload_to='perfil/', blank=True, null=True)
 
     def __str__(self):
         return self.username

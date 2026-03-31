@@ -33,6 +33,8 @@ django-ninja-extra==0.31.3
     # via django-ninja-jwt
 django-ninja-jwt==5.4.4
     # via workmy
+django-ratelimit==4.1.0
+    # via workmy
 gunicorn==25.3.0
     # via workmy
 injector==0.24.0

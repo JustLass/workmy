@@ -1,7 +1,7 @@
 """
 Router CRUD para Serviços
 """
-from ninja import Router
+from ninja import Router, Form
 from typing import List
 from gestao_freelas.models import Servico
 from api.schemas import ServicoInSchema, ServicoOutSchema, ErrorSchema, MessageSchema
@@ -51,7 +51,7 @@ def get_servico(request, servico_id: int):
 
 
 @router.post("/", response={201: ServicoOutSchema}, summary="Criar novo serviço")
-def create_servico(request, payload: ServicoInSchema):
+def create_servico(request, payload: Form[ServicoInSchema]):
     """
     Cria um novo serviço para o usuário autenticado.
     
@@ -75,7 +75,7 @@ def create_servico(request, payload: ServicoInSchema):
 
 
 @router.put("/{servico_id}", response={200: ServicoOutSchema, 404: ErrorSchema}, summary="Atualizar serviço")
-def update_servico(request, servico_id: int, payload: ServicoInSchema):
+def update_servico(request, servico_id: int, payload: Form[ServicoInSchema]):
     """
     Atualiza um serviço existente do usuário autenticado.
     

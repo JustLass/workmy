@@ -34,7 +34,9 @@ SECRET_KEY = os.environ.get('SECRET_KEY', chave_padrao)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-ALLOWED_HOSTS = ['*']
+# ALLOWED_HOSTS - usar variável de ambiente em produção
+# No Render: ALLOWED_HOSTS=seu-app.onrender.com,localhost
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 
 # Application definition
@@ -78,7 +80,7 @@ ROOT_URLCONF = 'core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [BASE_DIR / 'templates'],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -162,15 +164,18 @@ LOGIN_REDIRECT_URL = '/'
 # Diz ao Django qual é o nome da rota de login caso um usuário deslogado tente acessar uma página bloqueada
 LOGIN_URL = 'login'
 
-# CORS Configuration (para desenvolvimento local)
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-    "http://localhost:5173",  # Vite default port
-    "http://127.0.0.1:3000",
-    "http://127.0.0.1:5173",
-]
+# CORS Configuration
+# Em produção, adicionar no Render: CORS_ALLOWED_ORIGINS=https://seu-frontend.vercel.app,http://localhost:3000
+CORS_ALLOWED_ORIGINS = os.environ.get(
+    'CORS_ALLOWED_ORIGINS',
+    'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173'
+).split(',')
 
 CORS_ALLOW_CREDENTIALS = True
+CSRF_TRUSTED_ORIGINS = os.environ.get(
+    'CSRF_TRUSTED_ORIGINS',
+    'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173'
+).split(',')
 
 # Django Ninja JWT Settings
 from datetime import timedelta
@@ -186,3 +191,16 @@ NINJA_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 }
+
+# Security Settings for Production
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    X_FRAME_OPTIONS = 'DENY'

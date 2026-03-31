@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+    <link rel="icon" href="https://django-ninja.dev/img/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="https://django-ninja.dev/img/favicon.png" type="image/png">
+    <title>{{ api.title }}</title>
+</head>
+<body>
+    <div id="swagger-ui">
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script type="application/json" id="swagger-settings">
+        {{ swagger_settings | safe }}
+    </script>
+    <script>
+
+        const configJson = document.getElementById("swagger-settings").textContent;
+        const configObject = JSON.parse(configJson);
+
+        configObject.dom_id = "#swagger-ui";
+        configObject.presets = [
+            SwaggerUIBundle.presets.apis,
+            SwaggerUIBundle.SwaggerUIStandalonePreset
+        ];
+    {% if add_csrf %}
+        configObject.requestInterceptor = (req) => {
+            req.headers['X-CSRFToken'] = "{{csrf_token}}";
+            return req;
+        };
+    {% endif %}
+
+        const ui = SwaggerUIBundle(configObject);
+
+        ui.getConfigs().requestInterceptor = (req) => {
+            if (req.url.endsWith('/api/auth/login') && req.method === 'POST') {
+                req.headers['Content-Type'] = 'application/x-www-form-urlencoded';
+            }
+            return req;
+        };
+
+        const originalFetch = window.fetch;
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            try {
+                const url = typeof args[0] === "string" ? args[0] : args[0].url;
+                if (url.endsWith('/api/auth/login') && response.ok) {
+                    const cloned = response.clone();
+                    const data = await cloned.json();
+                    if (data && data.access) {
+                        ui.authActions.authorize({
+                            AuthBearer: {
+                                name: "AuthBearer",
+                                schema: { type: "http", scheme: "bearer" },
+                                value: data.access
+                            }
+                        });
+                    }
+                }
+            } catch (e) {
+                // Ignora erros de parsing para não impactar o fluxo do Swagger
+            }
+            return response;
+        };
+
+    </script>
+</body>
+</html>

@@ -3,11 +3,25 @@ from django.contrib.auth.admin import UserAdmin
 from .models import Usuario
 
 @admin.register(Usuario)
-class UsuarioCustomizadoAdmin(UserAdmin):
+class UsuarioAdmin(UserAdmin):
     """
-    Adiciona os nossos campos personalizados ao painel de administração padrão do Django.
+    Interface administrativa customizada para o modelo Usuario.
     """
-    # Adicionamos uma nova secção 'Informações Extras' ao ecrã de edição de utilizadores
+    list_display = ['username', 'email', 'first_name', 'last_name', 'telefone', 'is_staff', 'date_joined']
+    list_filter = ['is_staff', 'is_superuser', 'is_active', 'date_joined']
+    search_fields = ['username', 'email', 'first_name', 'last_name', 'telefone']
+    ordering = ['-date_joined']
+    
+    # Adiciona os campos customizados nos fieldsets
     fieldsets = UserAdmin.fieldsets + (
-        ('Informações Extras', {'fields': ('telefone', 'foto_perfil')}),
+        ('Informações Adicionais', {
+            'fields': ('telefone',)
+        }),
+    )
+    
+    # Adiciona os campos customizados ao formulário de criação
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        ('Informações Adicionais', {
+            'fields': ('email', 'telefone')
+        }),
     )

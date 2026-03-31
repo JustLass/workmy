@@ -1,7 +1,7 @@
 """
 Router CRUD para Clientes
 """
-from ninja import Router
+from ninja import Router, Form
 from typing import List
 from django.shortcuts import get_object_or_404
 from gestao_freelas.models import Cliente
@@ -54,7 +54,7 @@ def get_cliente(request, cliente_id: int):
 
 
 @router.post("/", response={201: ClienteOutSchema, 400: ErrorSchema}, summary="Criar novo cliente")
-def create_cliente(request, payload: ClienteInSchema):
+def create_cliente(request, payload: Form[ClienteInSchema]):
     """
     Cria um novo cliente para o usuário autenticado.
     
@@ -81,7 +81,7 @@ def create_cliente(request, payload: ClienteInSchema):
 
 
 @router.put("/{cliente_id}", response={200: ClienteOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar cliente")
-def update_cliente(request, cliente_id: int, payload: ClienteInSchema):
+def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
     """
     Atualiza um cliente existente do usuário autenticado.
     

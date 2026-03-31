@@ -1,7 +1,7 @@
 """
 Router CRUD para Projetos
 """
-from ninja import Router
+from ninja import Router, Form
 from typing import List
 from gestao_freelas.models import Projeto, Cliente, Servico
 from api.schemas import ProjetoInSchema, ProjetoOutSchema, ErrorSchema, MessageSchema
@@ -55,7 +55,7 @@ def get_projeto(request, projeto_id: int):
 
 
 @router.post("/", response={201: ProjetoOutSchema, 400: ErrorSchema, 404: ErrorSchema}, summary="Criar novo projeto")
-def create_projeto(request, payload: ProjetoInSchema):
+def create_projeto(request, payload: Form[ProjetoInSchema]):
     """
     Cria um novo projeto associando um cliente e um serviço.
     
@@ -97,7 +97,7 @@ def create_projeto(request, payload: ProjetoInSchema):
 
 
 @router.put("/{projeto_id}", response={200: ProjetoOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar projeto")
-def update_projeto(request, projeto_id: int, payload: ProjetoInSchema):
+def update_projeto(request, projeto_id: int, payload: Form[ProjetoInSchema]):
     """
     Atualiza um projeto existente do usuário autenticado.
     
