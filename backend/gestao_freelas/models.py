@@ -42,6 +42,7 @@ class Pagamento(models.Model):
     # Opções simplificadas e diretas
     TIPO_PAGAMENTO_CHOICES = [
         ('MENSAL', 'Mensalidade'),
+        ('QUINZENAL', 'Quinzenal'),
         ('AVULSO', 'Pagamento Avulso / Extra'),
     ]
 

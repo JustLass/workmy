@@ -89,8 +89,8 @@ def _rate_limit_exceeded_response():
     return 429, {"detail": "Rate limit exceeded. Try again later."}
 
 
-@router.post("/register", response={200: TokenResponseSchema, 400: ErrorSchema}, summary="Registrar novo usuário")
-@ratelimit(key='ip', rate='3/h', method='POST', block=False)
+@router.post("/register", response={200: TokenResponseSchema, 400: ErrorSchema, 429: ErrorSchema}, summary="Registrar novo usuário")
+@ratelimit(key='ip', rate='20/h', method='POST', block=False)
 def register(request, payload: Form[UserRegisterSchema]):
     """
     Registra um novo usuário no sistema.
@@ -136,8 +136,8 @@ def register(request, payload: Form[UserRegisterSchema]):
     }
 
 
-@router.post("/login", response={200: TokenResponseSchema, 401: ErrorSchema}, summary="Login de usuário")
-@ratelimit(key='ip', rate='5/m', method='POST', block=False)
+@router.post("/login", response={200: TokenResponseSchema, 401: ErrorSchema, 429: ErrorSchema}, summary="Login de usuário")
+@ratelimit(key='ip', rate='60/h', method='POST', block=False)
 def login(request, payload: Form[UserLoginSchema]):
     """
     Autentica um usuário e retorna tokens JWT.
@@ -170,8 +170,8 @@ def login(request, payload: Form[UserLoginSchema]):
     }
 
 
-@router.post("/refresh", response={200: AccessTokenSchema, 401: ErrorSchema}, summary="Renovar access token")
-@ratelimit(key='ip', rate='10/m', method='POST', block=False)
+@router.post("/refresh", response={200: AccessTokenSchema, 401: ErrorSchema, 429: ErrorSchema}, summary="Renovar access token")
+@ratelimit(key='ip', rate='120/h', method='POST', block=False)
 def refresh_token(request, payload: Form[RefreshTokenSchema]):
     """
     Renova o access token usando o refresh token.

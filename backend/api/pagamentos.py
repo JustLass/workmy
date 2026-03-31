@@ -111,8 +111,9 @@ def create_pagamento(request, payload: Form[PagamentoInSchema]):
         return 404, {"detail": "Projeto não encontrado ou não pertence a você"}
     
     # Valida tipo de pagamento
-    if payload.tipo_pagamento not in ['MENSAL', 'AVULSO']:
-        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL ou AVULSO"}
+    tipos_validos = ['MENSAL', 'AVULSO', 'QUINZENAL']
+    if payload.tipo_pagamento not in tipos_validos:
+        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL, AVULSO ou QUINZENAL"}
     
     pagamento = Pagamento.objects.create(
         projeto=projeto,
@@ -170,8 +171,9 @@ def update_pagamento(request, pagamento_id: int, payload: Form[PagamentoInSchema
         return 404, {"detail": "Projeto não encontrado ou não pertence a você"}
     
     # Valida tipo de pagamento
-    if payload.tipo_pagamento not in ['MENSAL', 'AVULSO']:
-        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL ou AVULSO"}
+    tipos_validos = ['MENSAL', 'AVULSO', 'QUINZENAL']
+    if payload.tipo_pagamento not in tipos_validos:
+        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL, AVULSO ou QUINZENAL"}
     
     pagamento.projeto = projeto
     pagamento.valor = payload.valor

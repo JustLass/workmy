@@ -108,13 +108,23 @@ class PagamentoInSchema(Schema):
     
     projeto_id: int = Field(..., description="ID do projeto", title="ID do projeto")
     valor: Decimal = Field(..., gt=0, description="Valor do pagamento", title="Valor")
-    tipo_pagamento: Literal["MENSAL", "AVULSO"] = Field(
+    tipo_pagamento: Literal["MENSAL", "AVULSO", "QUINZENAL"] = Field(
         ...,
-        description="Tipo do pagamento: MENSAL ou AVULSO",
+        description="Tipo do pagamento: MENSAL, AVULSO ou QUINZENAL",
         title="Tipo de pagamento"
     )
     data: date = Field(..., description="Data do pagamento ou vencimento", title="Data")
     observacao: Optional[str] = Field(None, max_length=500, description="Observação (opcional)", title="Observação")
+
+    @field_validator("tipo_pagamento", mode="before")
+    @classmethod
+    def normalizar_tipo_pagamento(cls, value: str) -> str:
+        if value is None:
+            raise ValueError("Tipo de pagamento é obrigatório.")
+        tipo = str(value).strip().upper()
+        if tipo in ("QUINZEMA", "QUINZENA"):
+            tipo = "QUINZENAL"
+        return tipo
 
 
 class PagamentoOutSchema(Schema):
