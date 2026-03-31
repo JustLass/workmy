@@ -9,6 +9,7 @@ export function PagamentosPage() {
   const { request } = useApi()
   const [items, setItems] = useState<Pagamento[]>([])
   const [projetos, setProjetos] = useState<Projeto[]>([])
+  const [editingId, setEditingId] = useState<number | null>(null)
   const [form, setForm] = useState({
     projeto_id: '',
     valor: '',
@@ -42,13 +43,21 @@ export function PagamentosPage() {
     setLoading(true)
     setError('')
     try {
-      await request('/pagamentos/', {
-        method: 'POST',
-        body: {
-          ...form,
-          projeto_id: Number(form.projeto_id),
-        },
-      })
+      const payload = {
+        ...form,
+        projeto_id: Number(form.projeto_id),
+      }
+      if (editingId) {
+        await request(`/pagamentos/${editingId}`, {
+          method: 'PUT',
+          body: payload,
+        })
+      } else {
+        await request('/pagamentos/', {
+          method: 'POST',
+          body: payload,
+        })
+      }
       setForm({
         projeto_id: '',
         valor: '',
@@ -56,6 +65,7 @@ export function PagamentosPage() {
         data: '',
         observacao: '',
       })
+      setEditingId(null)
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao salvar pagamento')
@@ -64,9 +74,35 @@ export function PagamentosPage() {
     }
   }
 
+  const onEdit = (item: Pagamento) => {
+    setEditingId(item.id)
+    setForm({
+      projeto_id: String(item.projeto_id),
+      valor: item.valor,
+      tipo_pagamento: item.tipo_pagamento,
+      data: item.data,
+      observacao: item.observacao ?? '',
+    })
+    setError('')
+  }
+
+  const onCancelEdit = () => {
+    setEditingId(null)
+    setForm({
+      projeto_id: '',
+      valor: '',
+      tipo_pagamento: 'MENSAL',
+      data: '',
+      observacao: '',
+    })
+  }
+
   const onDelete = async (id: number) => {
     try {
       await request(`/pagamentos/${id}`, { method: 'DELETE' })
+      if (editingId === id) {
+        onCancelEdit()
+      }
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao excluir pagamento')
@@ -138,8 +174,13 @@ export function PagamentosPage() {
         </label>
 
         <button className="btn" type="submit" disabled={loading}>
-          {loading ? 'Salvando...' : 'Adicionar pagamento'}
+          {loading ? 'Salvando...' : editingId ? 'Atualizar pagamento' : 'Adicionar pagamento'}
         </button>
+        {editingId ? (
+          <button className="btn btn-secondary" type="button" onClick={onCancelEdit}>
+            Cancelar edição
+          </button>
+        ) : null}
       </form>
 
       {error && <p className="error">{error}</p>}
@@ -152,6 +193,7 @@ export function PagamentosPage() {
               <th>Tipo</th>
               <th>Valor</th>
               <th>Data</th>
+              <th>Atualizado em</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -164,7 +206,11 @@ export function PagamentosPage() {
                 <td>{item.tipo_pagamento}</td>
                 <td>{formatCurrency(item.valor)}</td>
                 <td>{formatDate(item.data)}</td>
+                <td>{formatDate(item.atualizado_em)}</td>
                 <td>
+                  <button className="btn btn-secondary" onClick={() => onEdit(item)}>
+                    Editar
+                  </button>
                   <button className="btn btn-danger" onClick={() => void onDelete(item.id)}>
                     Excluir
                   </button>

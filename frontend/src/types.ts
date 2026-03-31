@@ -46,6 +46,7 @@ export type Pagamento = {
   tipo_pagamento_display: string
   data: string
   observacao?: string | null
+  atualizado_em: string
 }
 
 export type DashboardMensal = {

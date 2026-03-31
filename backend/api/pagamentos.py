@@ -51,7 +51,8 @@ def list_pagamentos(request, filtros: ListPagamentosQuerySchema = Query(...)):
             "tipo_pagamento": p.tipo_pagamento,
             "tipo_pagamento_display": p.get_tipo_pagamento_display(),
             "data": p.data.isoformat(),
-            "observacao": p.observacao
+            "observacao": p.observacao,
+            "atualizado_em": p.atualizado_em.isoformat(),
         }
         for p in pagamentos
     ]
@@ -85,7 +86,8 @@ def get_pagamento(request, pagamento_id: int):
             "tipo_pagamento": pagamento.tipo_pagamento,
             "tipo_pagamento_display": pagamento.get_tipo_pagamento_display(),
             "data": pagamento.data.isoformat(),
-            "observacao": pagamento.observacao
+            "observacao": pagamento.observacao,
+            "atualizado_em": pagamento.atualizado_em.isoformat(),
         }
     except Pagamento.DoesNotExist:
         return 404, {"detail": "Pagamento não encontrado"}
@@ -135,7 +137,8 @@ def create_pagamento(request, payload: Form[PagamentoInSchema]):
         "tipo_pagamento": pagamento.tipo_pagamento,
         "tipo_pagamento_display": pagamento.get_tipo_pagamento_display(),
         "data": pagamento.data.isoformat(),
-        "observacao": pagamento.observacao
+        "observacao": pagamento.observacao,
+        "atualizado_em": pagamento.atualizado_em.isoformat(),
     }
 
 
@@ -194,7 +197,8 @@ def update_pagamento(request, pagamento_id: int, payload: Form[PagamentoInSchema
         "tipo_pagamento": pagamento.tipo_pagamento,
         "tipo_pagamento_display": pagamento.get_tipo_pagamento_display(),
         "data": pagamento.data.isoformat(),
-        "observacao": pagamento.observacao
+        "observacao": pagamento.observacao,
+        "atualizado_em": pagamento.atualizado_em.isoformat(),
     }
 
 

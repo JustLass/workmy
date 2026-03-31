@@ -155,6 +155,7 @@ def get_cliente_detalhe(request, cliente_id: int):
                 "tipo_pagamento_display": pag.get_tipo_pagamento_display(),
                 "data": pag.data.isoformat(),
                 "observacao": pag.observacao,
+                "atualizado_em": pag.atualizado_em.isoformat(),
             }
             for pag in pagamentos
         ],

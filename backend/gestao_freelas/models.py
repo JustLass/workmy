@@ -58,6 +58,7 @@ class Pagamento(models.Model):
     
     data = models.DateField(help_text="Data do pagamento ou vencimento")
     observacao = models.TextField(blank=True, null=True, max_length=500)
+    atualizado_em = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.get_tipo_pagamento_display()}: R$ {self.valor} - {self.projeto.cliente.nome}"

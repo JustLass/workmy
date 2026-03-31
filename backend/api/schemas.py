@@ -139,6 +139,7 @@ class PagamentoOutSchema(Schema):
     tipo_pagamento_display: str = Field(..., description="Tipo do pagamento legível")
     data: str = Field(..., description="Data do pagamento")
     observacao: Optional[str] = Field(None, description="Observação")
+    atualizado_em: str = Field(..., description="Data/hora da última atualização do pagamento")
 
 
 class ClienteDetailOutSchema(Schema):
