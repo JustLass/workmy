@@ -3,6 +3,8 @@ Router CRUD para Serviços
 """
 from ninja import Router, Form
 from typing import List
+from django.db.models import Sum, Value, DecimalField
+from django.db.models.functions import Coalesce
 from gestao_freelas.models import Servico, Projeto, Cliente
 from api.schemas import ServicoInSchema, ServicoOutSchema, ServicoDetailOutSchema, ErrorSchema, MessageSchema
 from api.auth import AuthBearer
@@ -70,7 +72,17 @@ def get_servico_detalhe(request, servico_id: int):
         .order_by("-criado_em")
     )
     clientes_ids = [projeto.cliente_id for projeto in projetos]
-    clientes = Cliente.objects.filter(usuario=request.auth, id__in=clientes_ids).order_by("-criado_em")
+    clientes = (
+        Cliente.objects.filter(usuario=request.auth, id__in=clientes_ids)
+        .annotate(
+            total_acumulado=Coalesce(
+                Sum("projetos__pagamentos__valor"),
+                Value(0),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+        )
+        .order_by("-criado_em")
+    )
 
     return 200, {
         "servico": {
@@ -96,6 +108,7 @@ def get_servico_detalhe(request, servico_id: int):
                 "nome": cliente.nome,
                 "email": cliente.email,
                 "telefone": cliente.telefone,
+                "total_acumulado": str(cliente.total_acumulado),
                 "criado_em": cliente.criado_em.isoformat(),
             }
             for cliente in clientes
