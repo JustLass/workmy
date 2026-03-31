@@ -4,7 +4,7 @@ Router CRUD para Clientes
 from ninja import Router, Form
 from typing import List
 from django.shortcuts import get_object_or_404
-from django.db.models import Sum
+from django.db.models import Sum, Value, DecimalField
 from django.db.models.functions import Coalesce
 from gestao_freelas.models import Cliente, Servico, Projeto, Pagamento
 from api.schemas import (
@@ -28,7 +28,13 @@ def list_clientes(request):
     """
     clientes = (
         Cliente.objects.filter(usuario=request.auth)
-        .annotate(total_acumulado=Coalesce(Sum("projetos__pagamentos__valor"), 0))
+        .annotate(
+            total_acumulado=Coalesce(
+                Sum("projetos__pagamentos__valor"),
+                Value(0),
+                output_field=DecimalField(max_digits=10, decimal_places=2),
+            )
+        )
         .order_by('-criado_em')
     )
     return [
@@ -62,7 +68,11 @@ def get_cliente(request, cliente_id: int):
             "telefone": cliente.telefone,
             "total_acumulado": str(
                 Pagamento.objects.filter(projeto__cliente=cliente).aggregate(
-                    total=Coalesce(Sum("valor"), 0)
+                    total=Coalesce(
+                        Sum("valor"),
+                        Value(0),
+                        output_field=DecimalField(max_digits=10, decimal_places=2),
+                    )
                 )["total"]
             ),
             "criado_em": cliente.criado_em.isoformat()
@@ -104,7 +114,13 @@ def get_cliente_detalhe(request, cliente_id: int):
             "email": cliente.email,
             "telefone": cliente.telefone,
             "total_acumulado": str(
-                pagamentos.aggregate(total=Coalesce(Sum("valor"), 0))["total"]
+                pagamentos.aggregate(
+                    total=Coalesce(
+                        Sum("valor"),
+                        Value(0),
+                        output_field=DecimalField(max_digits=10, decimal_places=2),
+                    )
+                )["total"]
             ),
             "criado_em": cliente.criado_em.isoformat(),
         },
@@ -202,7 +218,11 @@ def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
         "telefone": cliente.telefone,
         "total_acumulado": str(
             Pagamento.objects.filter(projeto__cliente=cliente).aggregate(
-                total=Coalesce(Sum("valor"), 0)
+                total=Coalesce(
+                    Sum("valor"),
+                    Value(0),
+                    output_field=DecimalField(max_digits=10, decimal_places=2),
+                )
             )["total"]
         ),
         "criado_em": cliente.criado_em.isoformat()
