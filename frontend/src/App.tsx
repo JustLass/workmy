@@ -8,6 +8,7 @@ import { ClientesPage } from './pages/ClientesPage.tsx'
 import { ServicosPage } from './pages/ServicosPage.tsx'
 import { ClienteDetailPage } from './pages/ClienteDetailPage.tsx'
 import { ServicoDetailPage } from './pages/ServicoDetailPage.tsx'
+import { PagamentosPage } from './pages/PagamentosPage.tsx'
 
 function App() {
   return (
@@ -29,6 +30,7 @@ function App() {
         <Route path="clientes/:id" element={<ClienteDetailPage />} />
         <Route path="servicos" element={<ServicosPage />} />
         <Route path="servicos/:id" element={<ServicoDetailPage />} />
+        <Route path="pagamentos" element={<PagamentosPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

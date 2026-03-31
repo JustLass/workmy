@@ -9,6 +9,7 @@ from api.servicos import router as servicos_router
 from api.projetos import router as projetos_router
 from api.pagamentos import router as pagamentos_router
 from api.dashboard import router as dashboard_router
+from api.health import router as health_router
 
 # Cria a API principal
 api = NinjaAPI(
@@ -28,3 +29,6 @@ api.add_router("/pagamentos/", router=pagamentos_router)
 
 # Adiciona router de dashboard
 api.add_router("/dashboard/", router=dashboard_router)
+
+# Endpoints públicos de health check
+api.add_router("/health/", router=health_router)
