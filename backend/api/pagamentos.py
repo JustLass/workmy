@@ -3,6 +3,9 @@ Router CRUD para Pagamentos
 """
 from ninja import Router, Query, Schema, Form
 from typing import List, Optional
+import json
+from urllib.parse import parse_qs
+from pydantic import ValidationError
 from gestao_freelas.models import Pagamento, Projeto
 from api.schemas import PagamentoInSchema, PagamentoOutSchema, ErrorSchema, MessageSchema
 from api.auth import AuthBearer
@@ -143,7 +146,7 @@ def create_pagamento(request, payload: Form[PagamentoInSchema]):
 
 
 @router.put("/{pagamento_id}", response={200: PagamentoOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar pagamento")
-def update_pagamento(request, pagamento_id: int, payload: Form[PagamentoInSchema]):
+def update_pagamento(request, pagamento_id: int):
     """
     Atualiza um pagamento existente do usuário autenticado.
     
@@ -156,6 +159,18 @@ def update_pagamento(request, pagamento_id: int, payload: Form[PagamentoInSchema
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
+    content_type = (request.headers.get("content-type", "") or "").lower()
+    if "application/json" in content_type:
+        raw_payload = json.loads(request.body.decode("utf-8") or "{}")
+    else:
+        form_payload = parse_qs(request.body.decode("utf-8"))
+        raw_payload = {key: values[0] for key, values in form_payload.items()}
+
+    try:
+        payload = PagamentoInSchema.model_validate(raw_payload)
+    except ValidationError:
+        return 400, {"detail": "Dados inválidos para atualização do pagamento"}
+
     # Pega todos os projetos do usuário autenticado
     projetos_ids = Projeto.objects.filter(usuario=request.auth).values_list('id', flat=True)
     

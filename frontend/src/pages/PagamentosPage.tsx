@@ -19,6 +19,8 @@ export function PagamentosPage() {
   })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const editingItem = items.find((item) => item.id === editingId) ?? null
+  const editingCode = editingItem ? `PG-${editingItem.id}-PRJ-${editingItem.projeto_id}` : ''
 
   const load = useCallback(async () => {
     setError('')
@@ -116,6 +118,12 @@ export function PagamentosPage() {
       </header>
 
       <form className="card form-grid" onSubmit={onSubmit}>
+        {editingId ? (
+          <label>
+            ID do pagamento (usado na atualização)
+            <input value={editingCode} disabled />
+          </label>
+        ) : null}
         <label>
           Projeto
           <select
@@ -189,6 +197,7 @@ export function PagamentosPage() {
         <table className="table">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Projeto</th>
               <th>Tipo</th>
               <th>Valor</th>
@@ -200,6 +209,7 @@ export function PagamentosPage() {
           <tbody>
             {items.map((item) => (
               <tr key={item.id}>
+                <td>PG-{item.id}-PRJ-{item.projeto_id}</td>
                 <td>
                   {item.projeto_cliente_nome} - {item.projeto_servico_nome}
                 </td>
@@ -209,7 +219,7 @@ export function PagamentosPage() {
                 <td>{formatDate(item.atualizado_em)}</td>
                 <td>
                   <button className="btn btn-secondary" onClick={() => onEdit(item)}>
-                    Editar
+                    Editar #{item.id}
                   </button>
                   <button className="btn btn-danger" onClick={() => void onDelete(item.id)}>
                     Excluir
