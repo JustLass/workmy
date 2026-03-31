@@ -5,7 +5,11 @@ import { useCallback } from 'react'
 const CACHE_PREFIX = 'workmy_cache_v1'
 const DEFAULT_TTL_MS = 45_000
 
-function buildCacheKey(path: string, query?: Record<string, string | number | undefined | null>) {
+function buildCacheKey(
+  scope: string,
+  path: string,
+  query?: Record<string, string | number | undefined | null>,
+) {
   const queryString = query
     ? Object.entries(query)
         .filter(([, v]) => v !== undefined && v !== null)
@@ -13,15 +17,15 @@ function buildCacheKey(path: string, query?: Record<string, string | number | un
         .map(([k, v]) => `${k}=${String(v)}`)
         .join('&')
     : ''
-  return `${CACHE_PREFIX}:${path}?${queryString}`
+  return `${scope}:${path}?${queryString}`
 }
 
 function readCache<T>(key: string): T | null {
   const raw = localStorage.getItem(key)
   if (!raw) return null
   try {
-    const parsed = JSON.parse(raw) as { expiresAt: number; value: T }
-    if (Date.now() > parsed.expiresAt) {
+    const parsed = JSON.parse(raw) as { expiresAt?: number | null; value: T }
+    if (typeof parsed.expiresAt === 'number' && Date.now() > parsed.expiresAt) {
       localStorage.removeItem(key)
       return null
     }
@@ -32,18 +36,18 @@ function readCache<T>(key: string): T | null {
   }
 }
 
-function writeCache<T>(key: string, value: T, ttlMs = DEFAULT_TTL_MS) {
+function writeCache<T>(key: string, value: T, ttlMs: number | null = DEFAULT_TTL_MS) {
   localStorage.setItem(
     key,
     JSON.stringify({
       value,
-      expiresAt: Date.now() + ttlMs,
+      expiresAt: ttlMs === null ? null : Date.now() + ttlMs,
     }),
   )
 }
 
-function invalidateCacheByPath(path: string) {
-  const prefix = `${CACHE_PREFIX}:${path}`
+function invalidateCacheByPath(scope: string, path: string) {
+  const prefix = `${scope}:${path}`
   for (let i = localStorage.length - 1; i >= 0; i -= 1) {
     const key = localStorage.key(i)
     if (key && key.startsWith(prefix)) {
@@ -53,7 +57,7 @@ function invalidateCacheByPath(path: string) {
 }
 
 export function useApi() {
-  const { accessToken, logout } = useAuth()
+  const { accessToken, logout, user } = useAuth()
 
   const request = useCallback(async <T,>(
     path: string,
@@ -61,11 +65,12 @@ export function useApi() {
       method?: 'GET' | 'POST' | 'PUT' | 'DELETE'
       body?: unknown
       query?: Record<string, string | number | undefined | null>
-      cacheTtlMs?: number
+      cacheTtlMs?: number | null
     },
   ) => {
     const method = options?.method ?? 'GET'
-    const cacheKey = buildCacheKey(path, options?.query)
+    const cacheScope = `${CACHE_PREFIX}:u${user?.id ?? 'anon'}`
+    const cacheKey = buildCacheKey(cacheScope, path, options?.query)
 
     try {
       if (method === 'GET') {
@@ -82,12 +87,12 @@ export function useApi() {
       if (method === 'GET') {
         writeCache(cacheKey, response, options?.cacheTtlMs)
       } else {
-        invalidateCacheByPath('/dashboard/mensal')
-        invalidateCacheByPath('/dashboard/extrato')
-        invalidateCacheByPath('/clientes/')
-        invalidateCacheByPath('/servicos/')
-        invalidateCacheByPath('/projetos/')
-        invalidateCacheByPath('/pagamentos/')
+        invalidateCacheByPath(cacheScope, '/dashboard/mensal')
+        invalidateCacheByPath(cacheScope, '/dashboard/extrato')
+        invalidateCacheByPath(cacheScope, '/clientes/')
+        invalidateCacheByPath(cacheScope, '/servicos/')
+        invalidateCacheByPath(cacheScope, '/projetos/')
+        invalidateCacheByPath(cacheScope, '/pagamentos/')
       }
 
       return response
@@ -95,7 +100,7 @@ export function useApi() {
       if ((error as { status?: number }).status === 401) logout()
       throw error
     }
-  }, [accessToken, logout])
+  }, [accessToken, logout, user?.id])
 
   return { request }
 }

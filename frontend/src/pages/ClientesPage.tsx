@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
-import type { Cliente, ClienteDetailResponse } from '../types'
+import type { Cliente } from '../types'
 import { ApiError } from '../lib/http'
 
 export function ClientesPage() {
@@ -26,19 +26,6 @@ export function ClientesPage() {
   useEffect(() => {
     void load()
   }, [load])
-
-  useEffect(() => {
-    if (!items.length) return
-    const warmup = window.setTimeout(() => {
-      const topItems = items.slice(0, 5)
-      topItems.forEach((item) => {
-        void request<ClienteDetailResponse>(`/clientes/${item.id}/detalhe`, { cacheTtlMs: 180_000 }).catch(
-          () => undefined,
-        )
-      })
-    }, 0)
-    return () => window.clearTimeout(warmup)
-  }, [items, request])
 
   const telefoneFormatado = useMemo(() => {
     const ddd = form.ddd.replace(/\D/g, '').slice(0, 2)
@@ -190,7 +177,13 @@ export function ClientesPage() {
                 <td>{item.telefone || '-'}</td>
                 <td className="table-action">
                   <div className="inline-actions">
-                    <Link className="btn btn-open icon-btn" to={`/clientes/${item.id}`} aria-label="Abrir cliente" title="Abrir cliente">
+                    <Link
+                      className="btn btn-open icon-btn"
+                      to={`/clientes/${item.id}`}
+                      state={{ clienteNome: item.nome }}
+                      aria-label="Abrir cliente"
+                      title="Abrir cliente"
+                    >
                       <svg viewBox="0 0 24 24" aria-hidden="true">
                         <path
                           d="M12 5C6.5 5 2.1 8.6 1 12c1.1 3.4 5.5 7 11 7s9.9-3.6 11-7c-1.1-3.4-5.5-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"

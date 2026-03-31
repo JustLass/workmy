@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { Cliente, ClienteDetailResponse, Pagamento, Projeto, Servico } from '../types'
 import { ApiError } from '../lib/http'
@@ -7,11 +7,15 @@ import { formatCurrency, formatDate } from '../lib/format'
 
 export function ClienteDetailPage() {
   const { id } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const { request } = useApi()
   const clienteId = Number(id)
+  const stateClienteNome = (location.state as { clienteNome?: string } | null)?.clienteNome
 
-  const [cliente, setCliente] = useState<Cliente | null>(null)
+  const [cliente, setCliente] = useState<Cliente | null>(
+    stateClienteNome ? { id: clienteId, nome: stateClienteNome, criado_em: '' } : null,
+  )
   const [servicos, setServicos] = useState<Servico[]>([])
   const [projetos, setProjetos] = useState<Projeto[]>([])
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([])
@@ -30,7 +34,7 @@ export function ClienteDetailPage() {
     setError('')
     try {
       const detailData = await request<ClienteDetailResponse>(`/clientes/${clienteId}/detalhe`, {
-        cacheTtlMs: 180_000,
+        cacheTtlMs: null,
       })
       setCliente(detailData.cliente)
       setServicos(detailData.servicos)

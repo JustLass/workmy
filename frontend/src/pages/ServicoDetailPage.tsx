@@ -1,16 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { Cliente, Servico, ServicoDetailResponse } from '../types'
 import { ApiError } from '../lib/http'
 
 export function ServicoDetailPage() {
   const { id } = useParams()
+  const location = useLocation()
   const navigate = useNavigate()
   const { request } = useApi()
   const servicoId = Number(id)
+  const stateServicoNome = (location.state as { servicoNome?: string } | null)?.servicoNome
 
-  const [servico, setServico] = useState<Servico | null>(null)
+  const [servico, setServico] = useState<Servico | null>(
+    stateServicoNome ? { id: servicoId, nome: stateServicoNome, criado_em: '' } : null,
+  )
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [error, setError] = useState('')
 
@@ -19,7 +23,7 @@ export function ServicoDetailPage() {
     setError('')
     try {
       const detailData = await request<ServicoDetailResponse>(`/servicos/${servicoId}/detalhe`, {
-        cacheTtlMs: 180_000,
+        cacheTtlMs: null,
       })
       setServico(detailData.servico)
       setClientes(detailData.clientes)
