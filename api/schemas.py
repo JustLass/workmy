@@ -13,19 +13,11 @@ import re
 
 class ClienteInSchema(Schema):
     """Schema para criação/atualização de cliente"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "nome": "João Silva",
-                "email": "joao.silva@example.com",
-                "telefone": "11987654321"
-            }
-        }
-    )
+    model_config = ConfigDict()
     
-    nome: str = Field(..., min_length=1, max_length=100, description="Nome do cliente", title="Nome", examples=["João Silva"])
-    email: Optional[str] = Field(None, max_length=254, description="Email do cliente (opcional)", title="Email", examples=["joao.silva@example.com"])
-    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do cliente (opcional)", title="Telefone", examples=["(11) 98765-4321"])
+    nome: str = Field(..., min_length=1, max_length=100, description="Nome do cliente", title="Nome")
+    email: Optional[str] = Field(None, max_length=254, description="Email do cliente (opcional)", title="Email")
+    telefone: Optional[str] = Field(None, max_length=20, description="Telefone do cliente (opcional)", title="Telefone")
 
     @field_validator("telefone")
     @classmethod
@@ -74,17 +66,10 @@ class ClienteOutSchema(Schema):
 
 class ServicoInSchema(Schema):
     """Schema para criação/atualização de serviço"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "nome": "Desenvolvimento Web",
-                "descricao": "Criação de sites e aplicações web responsivas"
-            }
-        }
-    )
+    model_config = ConfigDict()
     
-    nome: str = Field(..., min_length=1, max_length=150, description="Nome do serviço", title="Nome", examples=["Desenvolvimento Web"])
-    descricao: Optional[str] = Field(None, max_length=500, description="Descrição do serviço (opcional)", title="Descrição", examples=["Criação de sites e aplicações web responsivas"])
+    nome: str = Field(..., min_length=1, max_length=150, description="Nome do serviço", title="Nome")
+    descricao: Optional[str] = Field(None, max_length=500, description="Descrição do serviço (opcional)", title="Descrição")
 
 
 class ServicoOutSchema(Schema):
@@ -99,17 +84,10 @@ class ServicoOutSchema(Schema):
 
 class ProjetoInSchema(Schema):
     """Schema para criação/atualização de projeto"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "cliente_id": 1,
-                "servico_id": 1
-            }
-        }
-    )
+    model_config = ConfigDict()
     
-    cliente_id: int = Field(..., description="ID do cliente", title="ID do cliente", examples=[1])
-    servico_id: int = Field(..., description="ID do serviço", title="ID do serviço", examples=[1])
+    cliente_id: int = Field(..., description="ID do cliente", title="ID do cliente")
+    servico_id: int = Field(..., description="ID do serviço", title="ID do serviço")
 
 
 class ProjetoOutSchema(Schema):
@@ -126,28 +104,17 @@ class ProjetoOutSchema(Schema):
 
 class PagamentoInSchema(Schema):
     """Schema para criação/atualização de pagamento"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "projeto_id": 1,
-                "valor": "1500.00",
-                "tipo_pagamento": "MENSAL",
-                "data": "2026-04-01",
-                "observacao": "Pagamento referente ao mês de março"
-            }
-        }
-    )
+    model_config = ConfigDict()
     
-    projeto_id: int = Field(..., description="ID do projeto", title="ID do projeto", examples=[1])
-    valor: Decimal = Field(..., gt=0, description="Valor do pagamento", title="Valor", examples=["1500.00"])
+    projeto_id: int = Field(..., description="ID do projeto", title="ID do projeto")
+    valor: Decimal = Field(..., gt=0, description="Valor do pagamento", title="Valor")
     tipo_pagamento: Literal["MENSAL", "AVULSO"] = Field(
         ...,
         description="Tipo do pagamento: MENSAL ou AVULSO",
-        title="Tipo de pagamento",
-        examples=["MENSAL"]
+        title="Tipo de pagamento"
     )
-    data: date = Field(..., description="Data do pagamento ou vencimento", title="Data", examples=["2026-04-01"])
-    observacao: Optional[str] = Field(None, max_length=500, description="Observação (opcional)", title="Observação", examples=["Pagamento referente ao mês de março"])
+    data: date = Field(..., description="Data do pagamento ou vencimento", title="Data")
+    observacao: Optional[str] = Field(None, max_length=500, description="Observação (opcional)", title="Observação")
 
 
 class PagamentoOutSchema(Schema):

@@ -16,27 +16,7 @@ router = Router(tags=["Dashboard"], auth=AuthBearer())
 
 class DashboardMensalSchema(Schema):
     """Schema para dashboard mensal"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "mes": 4,
-                "ano": 2026,
-                "total_recebido": "5000.00",
-                "total_pagamentos": 3,
-                "pagamentos_mensais": 2,
-                "pagamentos_avulsos": 1,
-                "clientes_ativos": 2,
-                "por_cliente": [
-                    {
-                        "cliente_id": 1,
-                        "cliente_nome": "Empresa XYZ",
-                        "total": "2500.00",
-                        "quantidade_pagamentos": 1
-                    }
-                ]
-            }
-        }
-    )
+    model_config = ConfigDict()
     
     mes: int = Field(..., description="Mês do relatório")
     ano: int = Field(..., description="Ano do relatório")

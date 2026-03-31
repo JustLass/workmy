@@ -17,60 +17,40 @@ router = Router(tags=["Auth"])
 
 class UserRegisterSchema(Schema):
     """Schema para registro de novo usuário"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "username": "joao_silva",
-                "email": "joao@example.com",
-                "password": "senha123",
-                "telefone": "+55 11 98765-4321"
-            }
-        }
-    )
+    model_config = ConfigDict()
     
     username: str = Field(
         ...,
         min_length=3,
         max_length=150,
         description="Nome de usuário único",
-        title="Nome de usuário",
-        examples=["joao_silva"]
+        title="Nome de usuário"
     )
     email: str = Field(
         ...,
         description="Email do usuário (deve ser único)",
-        title="Email",
-        examples=["joao@example.com"]
+        title="Email"
     )
     password: str = Field(
         ...,
         min_length=6,
         description="Senha (mínimo 6 caracteres)",
-        title="Senha",
-        examples=["senha123"]
+        title="Senha"
     )
     telefone: Optional[str] = Field(
         None,
         max_length=20,
         description="Telefone do usuário (opcional)",
-        title="Telefone",
-        examples=["(11) 98765-4321"]
+        title="Telefone"
     )
 
 
 class UserLoginSchema(Schema):
     """Schema para login de usuário"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "username": "joao_silva",
-                "password": "senha123"
-            }
-        }
-    )
+    model_config = ConfigDict()
     
-    username: str = Field(..., description="Nome de usuário", title="Nome de usuário", examples=["joao_silva"])
-    password: str = Field(..., description="Senha do usuário", title="Senha", examples=["senha123"])
+    username: str = Field(..., description="Nome de usuário", title="Nome de usuário")
+    password: str = Field(..., description="Senha do usuário", title="Senha")
 
 
 class UserOutSchema(Schema):
@@ -90,15 +70,9 @@ class TokenResponseSchema(Schema):
 
 class RefreshTokenSchema(Schema):
     """Schema para renovação de token"""
-    model_config = ConfigDict(
-        json_schema_extra={
-            "example": {
-                "refresh": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-            }
-        }
-    )
+    model_config = ConfigDict()
     
-    refresh: str = Field(..., description="Token de refresh JWT", examples=["cole-seu-refresh-token-aqui"])
+    refresh: str = Field(..., description="Token de refresh JWT")
 
 
 class AccessTokenSchema(Schema):
