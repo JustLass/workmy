@@ -6,24 +6,26 @@ import type { Cliente, Servico } from '../types'
 import { ApiError } from '../lib/http'
 
 export function BootstrapDataGate({ children }: { children: ReactNode }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const { request } = useApi()
-  const [ready, setReady] = useState(true)
+  const [bootstrappedUserId, setBootstrappedUserId] = useState<number | null>(null)
+  const [retryToken, setRetryToken] = useState(0)
   const [error, setError] = useState('')
+  const shouldBootstrap = Boolean(isAuthenticated && user && bootstrappedUserId !== user.id)
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!shouldBootstrap || !user) return
 
     let cancelled = false
-    setReady(false)
-    setError('')
 
     void Promise.all([
       request<Cliente[]>('/clientes/', { cacheTtlMs: null }),
       request<Servico[]>('/servicos/', { cacheTtlMs: null }),
     ])
       .then(() => {
-        if (!cancelled) setReady(true)
+        if (cancelled) return
+        setBootstrappedUserId(user.id)
+        setError('')
       })
       .catch((err: unknown) => {
         if (cancelled) return
@@ -33,18 +35,18 @@ export function BootstrapDataGate({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [isAuthenticated, request])
+  }, [shouldBootstrap, user, request, retryToken])
 
   if (!isAuthenticated) return <>{children}</>
 
-  if (!ready) {
+  if (shouldBootstrap) {
     return (
       <div className="center-page">
         <div className="boot-loader">
           <div className="spinner" aria-hidden="true" />
           <p>Carregando clientes e serviços...</p>
           {error && (
-            <button type="button" className="btn" onClick={() => window.location.reload()}>
+            <button type="button" className="btn" onClick={() => setRetryToken((prev) => prev + 1)}>
               Tentar novamente
             </button>
           )}
