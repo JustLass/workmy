@@ -40,34 +40,56 @@
             setter.call(el, '');
             el.defaultValue = '';
             el.removeAttribute('value');
-            el.setAttribute('value', '');
             el.dispatchEvent(new Event('input', { bubbles: true }));
             el.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
+        function isRequestField(el) {
+            return !!el.closest('.opblock-body');
+        }
+
+        function isEditableInput(input) {
+            const t = (input.getAttribute('type') || 'text').toLowerCase();
+            return !['button', 'submit', 'reset', 'checkbox', 'radio', 'file', 'hidden'].includes(t);
+        }
+
         function clearDefaultStringValues() {
-            const textInputs = document.querySelectorAll('input[type="text"], input[type="password"], input[type="email"], input[type="search"], input:not([type])');
+            const textInputs = document.querySelectorAll('input');
             textInputs.forEach((input) => {
+                if (!isEditableInput(input) || !isRequestField(input)) return;
                 const value = (input.value || '').trim().toLowerCase();
+                const defaultValue = (input.defaultValue || '').trim().toLowerCase();
                 const placeholder = (input.getAttribute('placeholder') || '').trim().toLowerCase();
-                if (value === 'string' || value === 'string($date)' || value === 'string($date-time)' || value === 'string($email)') {
+                const hasAutoValue = (
+                    value !== '' ||
+                    defaultValue !== '' ||
+                    placeholder.startsWith('string')
+                );
+                if (hasAutoValue && !input.dataset.userTyped) {
                     forceSetEmpty(input, nativeInputValueSetter);
                 }
-                if (placeholder === 'string' || placeholder === 'string($date)' || placeholder === 'string($date-time)' || placeholder === 'string($email)') {
+                if (placeholder.startsWith('string')) {
                     input.setAttribute('placeholder', '');
                 }
             });
+
             const textareas = document.querySelectorAll('textarea');
             textareas.forEach((area) => {
+                if (!isRequestField(area)) return;
                 const value = (area.value || '').trim().toLowerCase();
+                const defaultValue = (area.defaultValue || '').trim().toLowerCase();
+                const placeholder = (area.getAttribute('placeholder') || '').trim().toLowerCase();
                 const isRequestBody = area.classList.contains('body-param__text') || !!area.closest('.body-param');
-                if (isRequestBody) {
-                    forceSetEmpty(area, nativeTextAreaValueSetter);
-                } else if (value === 'string') {
+                const hasAutoValue = (
+                    isRequestBody ||
+                    value !== '' ||
+                    defaultValue !== '' ||
+                    placeholder.startsWith('string')
+                );
+                if (hasAutoValue && !area.dataset.userTyped) {
                     forceSetEmpty(area, nativeTextAreaValueSetter);
                 }
-                const placeholder = (area.getAttribute('placeholder') || '').trim().toLowerCase();
-                if (placeholder === 'string') {
+                if (placeholder.startsWith('string')) {
                     area.setAttribute('placeholder', '');
                 }
             });
@@ -79,16 +101,31 @@
         setTimeout(clearDefaultStringValues, 800);
         setTimeout(clearDefaultStringValues, 1500);
         setTimeout(clearDefaultStringValues, 3000);
-        const clearIntervalId = setInterval(clearDefaultStringValues, 400);
-        setTimeout(() => clearInterval(clearIntervalId), 10000);
+        setInterval(clearDefaultStringValues, 400);
 
         document.addEventListener('click', (event) => {
             const el = event.target;
             if (!(el instanceof Element)) return;
             if (el.closest('.try-out__btn') || el.closest('.opblock-summary') || el.closest('.btn.execute')) {
+                const opblock = el.closest('.opblock');
+                if (opblock) {
+                    opblock.querySelectorAll('input, textarea').forEach((field) => {
+                        field.dataset.userTyped = '';
+                    });
+                }
                 setTimeout(clearDefaultStringValues, 50);
                 setTimeout(clearDefaultStringValues, 200);
                 setTimeout(clearDefaultStringValues, 600);
+            }
+        });
+
+        document.addEventListener('input', (event) => {
+            const el = event.target;
+            if (!(el instanceof Element)) return;
+            if ((el.matches('input') || el.matches('textarea')) && isRequestField(el)) {
+                if ((el.value || '').trim() !== '') {
+                    el.dataset.userTyped = '1';
+                }
             }
         });
 
