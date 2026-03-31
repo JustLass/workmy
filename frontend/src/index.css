@@ -323,6 +323,13 @@ select:focus {
   align-items: end;
 }
 
+.phone-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 90px minmax(150px, 1fr) minmax(180px, 1fr);
+  align-items: end;
+}
+
 .auth-page {
   min-height: 100vh;
   display: grid;
@@ -378,6 +385,10 @@ select:focus {
 
 @media (max-width: 1020px) {
   .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .phone-grid {
     grid-template-columns: 1fr;
   }
 

@@ -21,6 +21,33 @@ export class ApiError extends Error {
   }
 }
 
+function extractErrorMessage(payload: unknown): string | null {
+  if (!payload) return null
+  if (typeof payload === 'string') return payload
+  if (Array.isArray(payload)) {
+    for (const item of payload) {
+      const nested = extractErrorMessage(item)
+      if (nested) return nested
+    }
+    return null
+  }
+  if (typeof payload === 'object') {
+    const obj = payload as Record<string, unknown>
+    if (typeof obj.detail === 'string') return obj.detail
+    if (obj.detail) {
+      const nested = extractErrorMessage(obj.detail)
+      if (nested) return nested
+    }
+    if (typeof obj.msg === 'string') return obj.msg
+    if (typeof obj.message === 'string') return obj.message
+    for (const value of Object.values(obj)) {
+      const nested = extractErrorMessage(value)
+      if (nested) return nested
+    }
+  }
+  return null
+}
+
 export async function http<T>(
   path: string,
   options?: {
@@ -63,9 +90,7 @@ export async function http<T>(
   }
 
   if (!res.ok) {
-    const message =
-      (data as { detail?: string } | null)?.detail ??
-      `Erro ${res.status} ao acessar a API`
+    const message = extractErrorMessage(data) ?? `Erro ${res.status} ao acessar a API`
     throw new ApiError(message, res.status)
   }
 

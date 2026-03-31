@@ -8,7 +8,7 @@ import { ApiError } from '../lib/http'
 export function ClientesPage() {
   const { request } = useApi()
   const [items, setItems] = useState<Cliente[]>([])
-  const [form, setForm] = useState({ nome: '', email: '', telefone: '' })
+  const [form, setForm] = useState({ nome: '', email: '', ddd: '', telefone_numero: '' })
   const [search, setSearch] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,13 +27,39 @@ export function ClientesPage() {
     void load()
   }, [load])
 
+  const telefoneFormatado = useMemo(() => {
+    const ddd = form.ddd.replace(/\D/g, '').slice(0, 2)
+    const numero = form.telefone_numero.replace(/\D/g, '').slice(0, 9)
+    if (!ddd || !numero) return ''
+    if (numero.length >= 9) return `(${ddd}) ${numero.slice(0, 5)}-${numero.slice(5, 9)}`
+    if (numero.length > 4) return `(${ddd}) ${numero.slice(0, 5)}-${numero.slice(5)}`
+    return `(${ddd}) ${numero}`
+  }, [form.ddd, form.telefone_numero])
+
+  const telefoneValido =
+    !form.ddd && !form.telefone_numero
+      ? true
+      : /^\d{2}$/.test(form.ddd.replace(/\D/g, '')) &&
+        /^\d{9}$/.test(form.telefone_numero.replace(/\D/g, ''))
+
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
+    if (!telefoneValido) {
+      setError('Telefone inválido. Use DDD com 2 dígitos e celular com 9 dígitos.')
+      return
+    }
     setLoading(true)
     setError('')
     try {
-      await request('/clientes/', { method: 'POST', body: form })
-      setForm({ nome: '', email: '', telefone: '' })
+      await request('/clientes/', {
+        method: 'POST',
+        body: {
+          nome: form.nome,
+          email: form.email,
+          telefone: telefoneFormatado || undefined,
+        },
+      })
+      setForm({ nome: '', email: '', ddd: '', telefone_numero: '' })
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao salvar cliente')
@@ -85,13 +111,39 @@ export function ClientesPage() {
             onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
           />
         </label>
-        <label>
-          Telefone
-          <input
-            value={form.telefone}
-            onChange={(e) => setForm((prev) => ({ ...prev, telefone: e.target.value }))}
-          />
-        </label>
+        <div className="phone-grid">
+          <label>
+            DDD
+            <input
+              inputMode="numeric"
+              maxLength={2}
+              placeholder="11"
+              value={form.ddd}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, ddd: e.target.value.replace(/\D/g, '').slice(0, 2) }))
+              }
+            />
+          </label>
+          <label>
+            Celular
+            <input
+              inputMode="numeric"
+              maxLength={9}
+              placeholder="987654321"
+              value={form.telefone_numero}
+              onChange={(e) =>
+                setForm((prev) => ({
+                  ...prev,
+                  telefone_numero: e.target.value.replace(/\D/g, '').slice(0, 9),
+                }))
+              }
+            />
+          </label>
+          <label>
+            Pré-visualização
+            <input value={telefoneFormatado} readOnly placeholder="(11) 98765-4321" />
+          </label>
+        </div>
         <button className="btn" type="submit" disabled={loading}>
           {loading ? 'Salvando...' : 'Adicionar cliente'}
         </button>
