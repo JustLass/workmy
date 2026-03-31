@@ -1,68 +1,72 @@
-# Workmy 🚀
+# WorkMy
 
-Sistema para gerenciamento de freelancers, focado em regras de negócio, integridade de dados e estabilidade.
+Sistema fullstack para gestão de clientes, serviços, projetos, pagamentos e indicadores.
 
-## 🏗️ Arquitetura e Tecnologias
-*   **Backend:** Python com Django
-*   **Banco de Dados:** PostgreSQL (hospedado na nuvem via Supabase)
-*   **Gerenciador de Pacotes e Ambiente:** `uv` (gerenciador super rápido escrito em Rust)
-*   **Deploy/Infra:** Render (com deploy automatizado via GitHub)
+## Estrutura do projeto
 
-## ⚙️ Pré-requisitos
-Antes de começar, você precisa ter instalado na sua máquina:
-1.  Git
-2.  Python (versão 3.12 ou superior)
-3.  [uv](https://docs.astral.sh/uv/getting-started/installation/) instalado globalmente.
+- `backend/` → API Django + Django Ninja (Render)
+- `frontend/` → React + Vite (Vercel)
 
----
+## Backend (Render)
 
-## 🚀 Passo a Passo para Desenvolvimento Local
+### Rodar local
 
-**1. Clone o repositório**
 ```bash
-git clone [https://github.com/SEU_USUARIO/workmy.git](https://github.com/SEU_USUARIO/workmy.git)
-cd workmy
+cd backend
+uv sync
+python manage.py migrate
+python manage.py runserver
 ```
 
-**2. Crie o ambiente virtual com o uv**
-Na raiz do projeto, rode o comando abaixo para criar a pasta `.venv`:
+API docs: `http://127.0.0.1:8000/api/docs`
+
+### Deploy no Render
+
+- Root Directory: `backend`
+- Build Command: `./build.sh`
+- Start Command: `gunicorn core.wsgi:application --bind 0.0.0.0:$PORT`
+
+Variáveis importantes no Render:
+
+- `DEBUG=False`
+- `SECRET_KEY=<valor-forte>`
+- `ALLOWED_HOSTS=<seu-backend>.onrender.com`
+- `CORS_ALLOWED_ORIGINS=https://<seu-frontend>.vercel.app`
+- `DATABASE_URL=<postgres-url>`
+
+## Frontend (Vercel)
+
+### Rodar local
+
 ```bash
-uv venv
-```
-*(Dica: Se estiver usando o VS Code, ele geralmente já reconhece o ambiente virtual automaticamente. Se precisar ativar manualmente no Windows, use `.venv\Scripts\activate`)*
-
-**3. Instale as dependências**
-Com o ambiente criado, instale as bibliotecas listadas no projeto:
-```bash
-uv pip install -r requirements.txt
+cd frontend
+npm install
+npm run dev
 ```
 
-**4. Configure as Variáveis de Ambiente (.env)**
-Na raiz do projeto (no mesmo nível do arquivo `manage.py`), crie um arquivo chamado **exatamente** `.env`.
-Solicite as credenciais do banco de dados para a equipe e preencha com o seguinte formato:
-```env
-DEBUG=True
-SECRET_KEY=uma-chave-secreta-qualquer-para-desenvolvimento
-DATABASE_URL=postgresql://usuario:senha@host-do-supabase:5432/postgres
-```
-*⚠️ Importante: O arquivo `.env` já está no `.gitignore`. Nunca suba suas senhas ou a URL do banco real para o repositório.*
+Frontend local: `http://127.0.0.1:5173`
 
-**5. Rode as migrações**
-Para garantir que o banco de dados está sincronizado com os modelos mais recentes do Django, execute:
-```bash
-uv run python manage.py migrate
-```
+### Deploy no Vercel
 
-**6. Suba o servidor local**
-```bash
-uv run python manage.py runserver
-```
-Pronto! Acesse `http://127.0.0.1:8000/` no seu navegador para ver o projeto rodando.
+Configure o projeto com:
 
----
+- Root Directory: `frontend`
+- Build Command: `npm run build`
+- Output Directory: `dist`
 
-## 📂 Estrutura de Pastas Principal
-*   `/core/` -> Configurações centrais do Django (`settings.py`, roteamento base).
-*   `/docs/` -> Diagramas, fluxos de tela e documentação de regras de negócio.
-*   `build.sh` -> Script utilizado internamente pelo Render para realizar o deploy em produção.
-*   `pyproject.toml` / `requirements.txt` -> Controle de dependências do projeto.
+Variável de ambiente obrigatória:
+
+- `VITE_API_BASE_URL=https://<seu-backend>.onrender.com/api`
+
+Observação: o frontend usa `VITE_API_BASE_URL` em `frontend/src/config.ts`.
+
+## Principais endpoints
+
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/clientes/`
+- `GET /api/servicos/`
+- `GET /api/projetos/`
+- `GET /api/pagamentos/`
+- `GET /api/dashboard/mensal`
+- `GET /api/dashboard/extrato`
