@@ -326,7 +326,7 @@ select:focus {
 .phone-grid {
   display: grid;
   gap: 10px;
-  grid-template-columns: 90px minmax(150px, 1fr) minmax(180px, 1fr);
+  grid-template-columns: 90px minmax(180px, 1fr);
   align-items: end;
 }
 

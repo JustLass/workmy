@@ -139,10 +139,6 @@ export function ClientesPage() {
               }
             />
           </label>
-          <label>
-            Pré-visualização
-            <input value={telefoneFormatado} readOnly placeholder="(11) 98765-4321" />
-          </label>
         </div>
         <button className="btn" type="submit" disabled={loading}>
           {loading ? 'Salvando...' : 'Adicionar cliente'}
