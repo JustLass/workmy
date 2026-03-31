@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path
 
 # Estas duas importações são obrigatórias para as imagens funcionarem
 from django.conf import settings
@@ -30,10 +30,11 @@ urlpatterns = [
     # API REST
     path('api/', api.urls),
     
-    # Rotas antigas (monolito) - manter por enquanto
-    path('', include('usuarios.urls')),
 ]
 
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+

@@ -1,68 +1,101 @@
-# Workmy 🚀
+# 🚀 WorkMy API - Sistema de Gestão de Freelancers
 
-Sistema para gerenciamento de freelancers, focado em regras de negócio, integridade de dados e estabilidade.
+[![Django](https://img.shields.io/badge/Django-6.0.3-green.svg)](https://www.djangoproject.com/)
+[![Django-Ninja](https://img.shields.io/badge/Django--Ninja-1.6.2-blue.svg)](https://django-ninja.rest-framework.com/)
+[![Python](https://img.shields.io/badge/Python-3.11+-blue.svg)](https://www.python.org/)
 
-## 🏗️ Arquitetura e Tecnologias
-*   **Backend:** Python com Django
-*   **Banco de Dados:** PostgreSQL (hospedado na nuvem via Supabase)
-*   **Gerenciador de Pacotes e Ambiente:** `uv` (gerenciador super rápido escrito em Rust)
-*   **Deploy/Infra:** Render (com deploy automatizado via GitHub)
-
-## ⚙️ Pré-requisitos
-Antes de começar, você precisa ter instalado na sua máquina:
-1.  Git
-2.  Python (versão 3.12 ou superior)
-3.  [uv](https://docs.astral.sh/uv/getting-started/installation/) instalado globalmente.
+API REST completa para gerenciamento de clientes, serviços, projetos e pagamentos para profissionais freelancers.
 
 ---
 
-## 🚀 Passo a Passo para Desenvolvimento Local
+## 📋 Índice
 
-**1. Clone o repositório**
+- [Sobre](#-sobre-o-projeto)
+- [Instalação Rápida](#-instalação-rápida)
+- [Documentação](#-documentação)
+- [Endpoints](#-endpoints-principais)
+- [Segurança](#-segurança)
+
+---
+
+## 🎯 Sobre o Projeto
+
+**WorkMy** facilita o controle de freelancers com:
+- 👥 Clientes | 💼 Serviços | 📁 Projetos | 💰 Pagamentos | 📊 Dashboard
+
+### ✨ Destaques
+- ✅ JWT Authentication | ✅ Swagger Docs | ✅ Django ORM | ✅ Validações Pydantic
+
+---
+
+## 🚀 Instalação Rápida
+
 ```bash
-git clone [https://github.com/SEU_USUARIO/workmy.git](https://github.com/SEU_USUARIO/workmy.git)
+git clone https://github.com/seu-usuario/workmy.git
 cd workmy
+uv sync
+python manage.py migrate
+python manage.py runserver
 ```
 
-**2. Crie o ambiente virtual com o uv**
-Na raiz do projeto, rode o comando abaixo para criar a pasta `.venv`:
-```bash
-uv venv
-```
-*(Dica: Se estiver usando o VS Code, ele geralmente já reconhece o ambiente virtual automaticamente. Se precisar ativar manualmente no Windows, use `.venv\Scripts\activate`)*
+**Acesse:** http://127.0.0.1:8000/api/docs
 
-**3. Instale as dependências**
-Com o ambiente criado, instale as bibliotecas listadas no projeto:
-```bash
-uv pip install -r requirements.txt
-```
+### Deploy no Render (com `uv`)
 
-**4. Configure as Variáveis de Ambiente (.env)**
-Na raiz do projeto (no mesmo nível do arquivo `manage.py`), crie um arquivo chamado **exatamente** `.env`.
-Solicite as credenciais do banco de dados para a equipe e preencha com o seguinte formato:
-```env
-DEBUG=True
-SECRET_KEY=uma-chave-secreta-qualquer-para-desenvolvimento
-DATABASE_URL=postgresql://usuario:senha@host-do-supabase:5432/postgres
-```
-*⚠️ Importante: O arquivo `.env` já está no `.gitignore`. Nunca suba suas senhas ou a URL do banco real para o repositório.*
-
-**5. Rode as migrações**
-Para garantir que o banco de dados está sincronizado com os modelos mais recentes do Django, execute:
-```bash
-uv run python manage.py migrate
-```
-
-**6. Suba o servidor local**
-```bash
-uv run python manage.py runserver
-```
-Pronto! Acesse `http://127.0.0.1:8000/` no seu navegador para ver o projeto rodando.
+- Build Command: `./build.sh`
+- Start Command: `gunicorn core.wsgi:application --bind 0.0.0.0:$PORT`
 
 ---
 
-## 📂 Estrutura de Pastas Principal
-*   `/core/` -> Configurações centrais do Django (`settings.py`, roteamento base).
-*   `/docs/` -> Diagramas, fluxos de tela e documentação de regras de negócio.
-*   `build.sh` -> Script utilizado internamente pelo Render para realizar o deploy em produção.
-*   `pyproject.toml` / `requirements.txt` -> Controle de dependências do projeto.
+## 📖 Documentação
+
+- 📚 **Swagger:** `/api/docs`
+- 📘 **[Docs Index](docs/README.md)** - Índice completo
+- 🔌 **[API Guide](docs/API.md)** - Endpoints detalhados
+- 🧠 **[Business Rules](docs/BUSINESS_RULES.md)** - Regras de negócio
+- 🏗️ **[Architecture](docs/ARCHITECTURE.md)** - Estrutura técnica
+- 🚀 **[Deploy Guide](docs/DEPLOY.md)** - Fluxo de deploy
+- 🧪 **[Testing Guide](docs/TESTING.md)** - Testes e validações
+- 🔒 **[Security Guide](docs/SECURITY.md)** - Hardening aplicado
+
+---
+
+## 📊 Endpoints Principais
+
+### Auth `/api/auth/`
+- `POST /register` - Registrar
+- `POST /login` - Login
+- `GET /me` - Dados do usuário
+
+### CRUD (requer autenticação)
+- `/api/clientes/` - Gerenciar clientes
+- `/api/servicos/` - Gerenciar serviços
+- `/api/projetos/` - Gerenciar projetos
+- `/api/pagamentos/` - Gerenciar pagamentos
+- `/api/dashboard/mensal` - Relatórios
+
+---
+
+## 🔒 Segurança
+
+✅ JWT (1h access, 7d refresh) | ✅ Isolamento por usuário | ✅ SQL Injection protected
+
+⚠️ **Produção:** Rate Limiting + HTTPS + hosts/origens restritos
+
+**Detalhes:** [SECURITY_AUDIT.md](SECURITY_AUDIT.md)
+
+---
+
+## 🗄️ Banco de Dados
+
+```
+Usuario ──┬──> Cliente
+          ├──> Servico  
+          └──> Projeto ──> Pagamento
+```
+
+**Ver:** [docs/DATABASE.md](docs/DATABASE.md)
+
+---
+
+⭐ **Gostou? Deixe uma estrela!**
