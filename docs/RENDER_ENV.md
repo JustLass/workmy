@@ -58,7 +58,18 @@ RENDER=true
 
 ## Vercel (frontend)
 
+| Campo | Valor |
+|-------|--------|
+| Root Directory | `frontend` |
+| Framework | Vite |
+| Build Command | `npm run build` |
+| Output Directory | `dist` |
+| Install Command | `npm install` |
+| Node.js | **20.x** (≥ 20.19 — Vite 8 exige) |
+
 ```env
 VITE_API_BASE_URL=https://workmy.onrender.com/api
 VITE_DEMO_MODE=false
 ```
+
+**Não adicione** `@rolldown/binding-win32-*` no `package.json` — são dependências opcionais do Vite só para Windows; no Linux (Vercel) quebram o install.
