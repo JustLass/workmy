@@ -32,9 +32,34 @@ _DEV_CORS = (
 )
 
 
+def _normalize_origin(value: str) -> str:
+    """Corrige typos comuns em URLs de origem (ex.: http// → http://)."""
+    origin = value.strip().rstrip('/')
+    if origin.startswith('http//'):
+        origin = f'http://{origin[6:]}'
+    return origin
+
+
 def _split_env_list(name: str, default: str = '') -> list[str]:
     raw = os.environ.get(name, default)
-    return [item.strip() for item in raw.split(',') if item.strip()]
+    seen: set[str] = set()
+    result: list[str] = []
+    for item in raw.split(','):
+        normalized = _normalize_origin(item)
+        if normalized and normalized not in seen:
+            seen.add(normalized)
+            result.append(normalized)
+    return result
+
+
+def _csrf_from_cors_and_hosts(cors_origins: list[str], hosts: list[str]) -> list[str]:
+    """Monta CSRF_TRUSTED_ORIGINS a partir de CORS + hosts HTTPS do backend."""
+    trusted: set[str] = set(cors_origins)
+    for host in hosts:
+        if host in ('localhost', '127.0.0.1'):
+            continue
+        trusted.add(f'https://{host}')
+    return list(trusted)
 
 
 # Quick-start development settings - unsuitable for production
@@ -186,6 +211,8 @@ LOGIN_URL = 'login'
 if ON_RENDER:
     CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS')
     CSRF_TRUSTED_ORIGINS = _split_env_list('CSRF_TRUSTED_ORIGINS')
+    if not CSRF_TRUSTED_ORIGINS and CORS_ALLOWED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS = _csrf_from_cors_and_hosts(CORS_ALLOWED_ORIGINS, _allowed_hosts_env)
 else:
     CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS', _DEV_CORS)
     CSRF_TRUSTED_ORIGINS = _split_env_list('CSRF_TRUSTED_ORIGINS', _DEV_CORS)
@@ -219,7 +246,9 @@ if ON_RENDER:
     if not CORS_ALLOWED_ORIGINS:
         _render_required.append('CORS_ALLOWED_ORIGINS (URL do Vercel)')
     if not CSRF_TRUSTED_ORIGINS:
-        _render_required.append('CSRF_TRUSTED_ORIGINS')
+        _render_required.append(
+            'CSRF_TRUSTED_ORIGINS ou CORS_ALLOWED_ORIGINS (para derivar CSRF automaticamente)'
+        )
     if DEBUG:
         _render_required.append('DEBUG=False')
     if _render_required:
