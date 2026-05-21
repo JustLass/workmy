@@ -43,10 +43,13 @@ export function ServicosPage() {
   }
 
   const onDelete = async (id: number) => {
+    const snapshot = items
+    setItems((prev) => prev.filter((item) => item.id !== id))
+    setError('')
     try {
       await request(`/servicos/${id}`, { method: 'DELETE' })
-      await load()
     } catch (err) {
+      setItems(snapshot)
       setError(err instanceof ApiError ? err.message : 'Erro ao excluir serviço')
     }
   }

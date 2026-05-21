@@ -7,6 +7,7 @@ from ninja import Router, Form, Query, Schema
 
 from api.projeto_serializers import projeto_to_dict
 from api.realtime import publish
+from api.cache import get_cached_response, set_cached_response, invalidate_user_cache
 from api.schemas import (
     ProjetoInSchema,
     ProjetoOutSchema,
@@ -28,17 +29,29 @@ class ListProjetosQuerySchema(Schema):
 
 @router.get("/", response=list[ProjetoOutSchema], summary="Listar todos os projetos")
 def list_projetos(request, filtros: ListProjetosQuerySchema = Query(...)):
+    query_key = {"cliente_id": filtros.cliente_id}
+    cached = get_cached_response(request.auth.id, "projetos", "list", query=query_key)
+    if cached is not None:
+        return cached
+
     projetos = Projeto.objects.filter(usuario=request.auth).select_related('cliente', 'servico').order_by('-criado_em')
     if filtros.cliente_id:
         projetos = projetos.filter(cliente_id=filtros.cliente_id)
-    return [projeto_to_dict(p) for p in projetos]
+    payload = [projeto_to_dict(p) for p in projetos]
+    return set_cached_response(request.auth.id, payload, "projetos", "list", query=query_key)
 
 
 @router.get("/{projeto_id}", response={200: ProjetoOutSchema, 404: ErrorSchema}, summary="Buscar projeto por ID")
 def get_projeto(request, projeto_id: int):
+    cached = get_cached_response(request.auth.id, "projetos", projeto_id)
+    if cached is not None:
+        return 200, cached
+
     try:
         projeto = Projeto.objects.select_related('cliente', 'servico').get(id=projeto_id, usuario=request.auth)
-        return 200, projeto_to_dict(projeto)
+        payload = projeto_to_dict(projeto)
+        set_cached_response(request.auth.id, payload, "projetos", projeto_id)
+        return 200, payload
     except Projeto.DoesNotExist:
         return 404, {"detail": "Projeto não encontrado"}
 
@@ -60,6 +73,7 @@ def create_projeto(request, payload: Form[ProjetoInSchema]):
 
     projeto = Projeto.objects.create(usuario=request.auth, cliente=cliente, servico=servico)
     publish(request.auth.id, 'projetos', 'created', meta={'projeto_id': projeto.id})
+    invalidate_user_cache(request.auth.id)
 
     return 201, projeto_to_dict(projeto)
 
@@ -88,6 +102,7 @@ def update_projeto(request, projeto_id: int, payload: Form[ProjetoInSchema]):
     projeto.servico = servico
     projeto.save()
     publish(request.auth.id, 'projetos', 'updated', meta={'projeto_id': projeto.id})
+    invalidate_user_cache(request.auth.id)
 
     projeto = Projeto.objects.select_related('cliente', 'servico').get(id=projeto.id)
     return 200, projeto_to_dict(projeto)
@@ -126,6 +141,7 @@ def definir_mensalista(request, projeto_id: int, payload: MensalistaInSchema):
             meta={'projeto_id': projeto.id, 'criados': geracao['criados']},
         )
         publish(request.auth.id, 'projetos', 'updated', meta={'projeto_id': projeto.id})
+        invalidate_user_cache(request.auth.id)
         return 200, {
             'mensalista': True,
             'valor_mensal': str(projeto.valor_mensal) if projeto.valor_mensal else None,
@@ -137,6 +153,7 @@ def definir_mensalista(request, projeto_id: int, payload: MensalistaInSchema):
     desativar_mensalista(projeto)
     projeto.refresh_from_db()
     publish(request.auth.id, 'projetos', 'updated', meta={'projeto_id': projeto.id})
+    invalidate_user_cache(request.auth.id)
     return 200, {
         'mensalista': False,
         'valor_mensal': str(projeto.valor_mensal) if projeto.valor_mensal else None,
@@ -153,6 +170,7 @@ def delete_projeto(request, projeto_id: int):
         descricao = f"{projeto.cliente.nome} - {projeto.servico.nome}"
         projeto.delete()
         publish(request.auth.id, 'projetos', 'deleted')
+        invalidate_user_cache(request.auth.id)
         return 200, {"message": f"Projeto '{descricao}' deletado com sucesso"}
     except Projeto.DoesNotExist:
         return 404, {"detail": "Projeto não encontrado"}

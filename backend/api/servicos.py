@@ -7,6 +7,7 @@ from django.db.models import Sum, Value, DecimalField
 from django.db.models.functions import Coalesce
 from gestao_freelas.models import Servico, Projeto, Cliente
 from api.schemas import ServicoInSchema, ServicoOutSchema, ServicoDetailOutSchema, ErrorSchema, MessageSchema
+from api.cache import get_cached_response, set_cached_response, invalidate_user_cache
 from api.auth import AuthBearer
 
 router = Router(tags=["Serviços"], auth=AuthBearer())
@@ -19,8 +20,12 @@ def list_servicos(request):
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
+    cached = get_cached_response(request.auth.id, "servicos", "list")
+    if cached is not None:
+        return cached
+
     servicos = Servico.objects.filter(usuario=request.auth).order_by('-criado_em')
-    return [
+    payload = [
         {
             "id": s.id,
             "nome": s.nome,
@@ -29,6 +34,7 @@ def list_servicos(request):
         }
         for s in servicos
     ]
+    return set_cached_response(request.auth.id, payload, "servicos", "list")
 
 
 @router.get("/{servico_id}", response={200: ServicoOutSchema, 404: ErrorSchema}, summary="Buscar serviço por ID")
@@ -40,14 +46,20 @@ def get_servico(request, servico_id: int):
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
+    cached = get_cached_response(request.auth.id, "servicos", servico_id)
+    if cached is not None:
+        return 200, cached
+
     try:
         servico = Servico.objects.get(id=servico_id, usuario=request.auth)
-        return 200, {
+        payload = {
             "id": servico.id,
             "nome": servico.nome,
             "descricao": servico.descricao,
             "criado_em": servico.criado_em.isoformat()
         }
+        set_cached_response(request.auth.id, payload, "servicos", servico_id)
+        return 200, payload
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado"}
 
@@ -61,6 +73,10 @@ def get_servico_detalhe(request, servico_id: int):
     """
     Retorna dados completos para a tela de detalhe do serviço em uma única requisição.
     """
+    cached = get_cached_response(request.auth.id, "servicos", servico_id, "detalhe")
+    if cached is not None:
+        return 200, cached
+
     try:
         servico = Servico.objects.get(id=servico_id, usuario=request.auth)
     except Servico.DoesNotExist:
@@ -84,7 +100,7 @@ def get_servico_detalhe(request, servico_id: int):
         .order_by("-criado_em")
     )
 
-    return 200, {
+    payload = {
         "servico": {
             "id": servico.id,
             "nome": servico.nome,
@@ -114,6 +130,8 @@ def get_servico_detalhe(request, servico_id: int):
             for cliente in clientes
         ],
     }
+    set_cached_response(request.auth.id, payload, "servicos", servico_id, "detalhe")
+    return 200, payload
 
 
 @router.post("/", response={201: ServicoOutSchema}, summary="Criar novo serviço")
@@ -131,7 +149,8 @@ def create_servico(request, payload: Form[ServicoInSchema]):
         nome=payload.nome,
         descricao=payload.descricao
     )
-    
+    invalidate_user_cache(request.auth.id)
+
     return 201, {
         "id": servico.id,
         "nome": servico.nome,
@@ -159,6 +178,7 @@ def update_servico(request, servico_id: int, payload: Form[ServicoInSchema]):
     servico.nome = payload.nome
     servico.descricao = payload.descricao
     servico.save()
+    invalidate_user_cache(request.auth.id)
     
     return 200, {
         "id": servico.id,
@@ -183,6 +203,7 @@ def delete_servico(request, servico_id: int):
         servico = Servico.objects.get(id=servico_id, usuario=request.auth)
         nome = servico.nome
         servico.delete()
+        invalidate_user_cache(request.auth.id)
         return 200, {"message": f"Serviço '{nome}' deletado com sucesso"}
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado"}

@@ -8,10 +8,20 @@ from decimal import Decimal
 from django.db.models import Sum, Count
 from gestao_freelas.models import Pagamento, Projeto, Cliente
 from api.schemas import ErrorSchema
+from api.cache import get_cached_response, set_cached_response
 from api.auth import AuthBearer
 from pydantic import Field, ConfigDict
 
 router = Router(tags=["Dashboard"], auth=AuthBearer())
+
+
+def _month_range(ano: int, mes: int) -> tuple[date, date]:
+    start = date(ano, mes, 1)
+    if mes == 12:
+        end = date(ano + 1, 1, 1)
+    else:
+        end = date(ano, mes + 1, 1)
+    return start, end
 
 
 class DashboardMensalSchema(Schema):
@@ -84,19 +94,35 @@ def dashboard_mensal(
     hoje = date.today()
     mes = filtros.mes or hoje.month
     ano = filtros.ano or hoje.year
-    
     # Valida mês
     if mes < 1 or mes > 12:
         return 400, {"detail": "Mês deve estar entre 1 e 12"}
     
-    # Pega todos os projetos do usuário
-    projetos_ids = Projeto.objects.filter(usuario=request.auth).values_list('id', flat=True)
-    
+    tipo_pagamento = None
+    if filtros.tipo_pagamento:
+        tipo_pagamento = filtros.tipo_pagamento.strip().upper()
+        if tipo_pagamento in ("QUINZEMA", "QUINZENA"):
+            tipo_pagamento = "QUINZENAL"
+        tipos_validos = {"MENSAL", "QUINZENAL", "AVULSO"}
+        if tipo_pagamento not in tipos_validos:
+            return 400, {"detail": "Tipo de pagamento inválido."}
+
+    query_key = {
+        "mes": mes,
+        "ano": ano,
+        "cliente_id": filtros.cliente_id,
+        "tipo_pagamento": tipo_pagamento,
+    }
+    cached = get_cached_response(request.auth.id, "dashboard", "mensal", query=query_key)
+    if cached is not None:
+        return 200, cached
+
     # Filtra pagamentos do mês
+    data_inicio, data_fim = _month_range(ano, mes)
     pagamentos_query = Pagamento.objects.filter(
-        projeto_id__in=projetos_ids,
-        data__month=mes,
-        data__year=ano
+        projeto__usuario=request.auth,
+        data__gte=data_inicio,
+        data__lt=data_fim,
     ).select_related('projeto', 'projeto__cliente')
     
     # Filtra por cliente se especificado
@@ -107,14 +133,7 @@ def dashboard_mensal(
         
         pagamentos_query = pagamentos_query.filter(projeto__cliente_id=filtros.cliente_id)
 
-    tipo_pagamento = None
-    if filtros.tipo_pagamento:
-        tipo_pagamento = filtros.tipo_pagamento.strip().upper()
-        if tipo_pagamento in ("QUINZEMA", "QUINZENA"):
-            tipo_pagamento = "QUINZENAL"
-        tipos_validos = {"MENSAL", "QUINZENAL", "AVULSO"}
-        if tipo_pagamento not in tipos_validos:
-            return 400, {"detail": "Tipo de pagamento inválido."}
+    if tipo_pagamento:
         pagamentos_query = pagamentos_query.filter(tipo_pagamento=tipo_pagamento)
     
     # Calcula totais
@@ -177,7 +196,7 @@ def dashboard_mensal(
         reverse=True
     )
     
-    return 200, {
+    payload = {
         'mes': mes,
         'ano': ano,
         'total_recebido': str(total_recebido),
@@ -186,6 +205,8 @@ def dashboard_mensal(
         'previsto_proximo_mes': str(previsto_proximo_mes_decimal),
         'por_cliente': por_cliente
     }
+    set_cached_response(request.auth.id, payload, "dashboard", "mensal", query=query_key)
+    return 200, payload
 
 
 @router.get("/extrato", response={200: List[ExtratoItemSchema], 400: ErrorSchema}, summary="Extrato geral")
@@ -196,9 +217,11 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
     - Se `data_inicio` e `data_fim` forem enviados, usa período de datas.
     - Caso contrário, usa `mes` e `ano` (ou mês/ano atual).
     """
-    projetos_ids = Projeto.objects.filter(usuario=request.auth).values_list('id', flat=True)
+    mes = filtros.mes
+    ano = filtros.ano
+
     pagamentos_query = Pagamento.objects.filter(
-        projeto_id__in=projetos_ids
+        projeto__usuario=request.auth
     ).select_related('projeto', 'projeto__cliente', 'projeto__servico')
 
     if filtros.cliente_id:
@@ -206,6 +229,7 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
             return 400, {"detail": "Cliente não encontrado ou não pertence a você"}
         pagamentos_query = pagamentos_query.filter(projeto__cliente_id=filtros.cliente_id)
 
+    tipo_pagamento = None
     if filtros.tipo_pagamento:
         tipo_pagamento = filtros.tipo_pagamento.strip().upper()
         if tipo_pagamento in ("QUINZEMA", "QUINZENA"):
@@ -228,10 +252,23 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
         hoje = date.today()
         mes = filtros.mes or hoje.month
         ano = filtros.ano or hoje.year
-        pagamentos_query = pagamentos_query.filter(data__month=mes, data__year=ano)
+        data_inicio, data_fim = _month_range(ano, mes)
+        pagamentos_query = pagamentos_query.filter(data__gte=data_inicio, data__lt=data_fim)
+
+    query_key = {
+        "mes": mes,
+        "ano": ano,
+        "data_inicio": filtros.data_inicio,
+        "data_fim": filtros.data_fim,
+        "cliente_id": filtros.cliente_id,
+        "tipo_pagamento": tipo_pagamento,
+    }
+    cached = get_cached_response(request.auth.id, "dashboard", "extrato", query=query_key)
+    if cached is not None:
+        return 200, cached
 
     pagamentos = pagamentos_query.order_by('-data', '-id')
-    return [
+    payload = [
         {
             "nome": p.projeto.cliente.nome,
             "data": p.data.isoformat(),
@@ -241,3 +278,5 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
         }
         for p in pagamentos
     ]
+    set_cached_response(request.auth.id, payload, "dashboard", "extrato", query=query_key)
+    return payload

@@ -75,7 +75,7 @@ class Pagamento(models.Model):
         default='MENSAL'
     )
     
-    data = models.DateField(help_text="Data do pagamento ou vencimento")
+    data = models.DateField(help_text="Data do pagamento ou vencimento", db_index=True)
     observacao = models.TextField(blank=True, null=True, max_length=500)
     atualizado_em = models.DateTimeField(auto_now=True)
     referencia_mes = models.CharField(

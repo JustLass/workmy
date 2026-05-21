@@ -55,10 +55,12 @@ export function ProjetosPage() {
   }
 
   const onDelete = async (id: number) => {
+    const snapshot = items
+    setItems((prev) => prev.filter((item) => item.id !== id))
     try {
       await request(`/projetos/${id}`, { method: 'DELETE' })
-      await load()
     } catch (err) {
+      setItems(snapshot)
       setError(err instanceof ApiError ? err.message : 'Erro ao excluir projeto')
     }
   }

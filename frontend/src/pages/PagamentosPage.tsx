@@ -105,13 +105,16 @@ export function PagamentosPage() {
   }
 
   const onDelete = async (id: number) => {
+    const snapshot = items
+    setItems((prev) => prev.filter((item) => item.id !== id))
+    setError('')
+    if (editingId === id) {
+      onCancelEdit()
+    }
     try {
       await request(`/pagamentos/${id}`, { method: 'DELETE' })
-      if (editingId === id) {
-        onCancelEdit()
-      }
-      await load()
     } catch (err) {
+      setItems(snapshot)
       setError(err instanceof ApiError ? err.message : 'Erro ao excluir pagamento')
     }
   }

@@ -59,10 +59,12 @@ export function ContratosPage() {
 
   const onDelete = async (id: number) => {
     if (!window.confirm('Excluir este contrato? Os pagamentos vinculados podem ser afetados.')) return
+    const snapshot = items
+    setItems((prev) => prev.filter((item) => item.id !== id))
     try {
       await request(`/projetos/${id}`, { method: 'DELETE' })
-      await load()
     } catch (err) {
+      setItems(snapshot)
       setError(err instanceof ApiError ? err.message : 'Erro ao excluir contrato')
     }
   }

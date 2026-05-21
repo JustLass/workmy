@@ -33,6 +33,9 @@
 - Frontend com cache em `localStorage` por usuário logado:
   - cache de GET persistente até invalidação explícita
   - invalidação automática após escritas (POST/PUT/DELETE)
+- Backend com cache por usuário para respostas de leitura (GET):
+  - reduz recomputação em listas e detalhes frequentes
+  - invalidação automática após escritas (POST/PUT/DELETE)
 - Bootstrap obrigatório no frontend:
   - carrega clientes e serviços antes de liberar as rotas protegidas
   - exibe animação de carregamento durante o preload.

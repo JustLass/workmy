@@ -14,6 +14,7 @@ from api.schemas import (
     ErrorSchema,
     MessageSchema,
 )
+from api.cache import get_cached_response, set_cached_response, invalidate_user_cache
 from api.auth import AuthBearer
 
 router = Router(tags=["Clientes"], auth=AuthBearer())
@@ -26,6 +27,10 @@ def list_clientes(request):
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
+    cached = get_cached_response(request.auth.id, "clientes", "list")
+    if cached is not None:
+        return cached
+
     clientes = (
         Cliente.objects.filter(usuario=request.auth)
         .annotate(
@@ -37,7 +42,7 @@ def list_clientes(request):
         )
         .order_by('-criado_em')
     )
-    return [
+    payload = [
         {
             "id": c.id,
             "nome": c.nome,
@@ -48,6 +53,7 @@ def list_clientes(request):
         }
         for c in clientes
     ]
+    return set_cached_response(request.auth.id, payload, "clientes", "list")
 
 
 @router.get("/{cliente_id}", response={200: ClienteOutSchema, 404: ErrorSchema}, summary="Buscar cliente por ID")
@@ -59,9 +65,13 @@ def get_cliente(request, cliente_id: int):
     
     **Requer autenticação:** Bearer token no header Authorization.
     """
+    cached = get_cached_response(request.auth.id, "clientes", cliente_id)
+    if cached is not None:
+        return 200, cached
+
     try:
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
-        return 200, {
+        payload = {
             "id": cliente.id,
             "nome": cliente.nome,
             "email": cliente.email,
@@ -77,6 +87,8 @@ def get_cliente(request, cliente_id: int):
             ),
             "criado_em": cliente.criado_em.isoformat()
         }
+        set_cached_response(request.auth.id, payload, "clientes", cliente_id)
+        return 200, payload
     except Cliente.DoesNotExist:
         return 404, {"detail": "Cliente não encontrado"}
 
@@ -90,6 +102,10 @@ def get_cliente_detalhe(request, cliente_id: int):
     """
     Retorna dados completos para a tela de detalhe do cliente em uma única requisição.
     """
+    cached = get_cached_response(request.auth.id, "clientes", cliente_id, "detalhe")
+    if cached is not None:
+        return 200, cached
+
     try:
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
     except Cliente.DoesNotExist:
@@ -107,7 +123,7 @@ def get_cliente_detalhe(request, cliente_id: int):
         .order_by("-data")
     )
 
-    return 200, {
+    payload = {
         "cliente": {
             "id": cliente.id,
             "nome": cliente.nome,
@@ -160,6 +176,8 @@ def get_cliente_detalhe(request, cliente_id: int):
             for pag in pagamentos
         ],
     }
+    set_cached_response(request.auth.id, payload, "clientes", cliente_id, "detalhe")
+    return 200, payload
 
 
 @router.post("/", response={201: ClienteOutSchema, 400: ErrorSchema}, summary="Criar novo cliente")
@@ -179,6 +197,8 @@ def create_cliente(request, payload: Form[ClienteInSchema]):
         email=payload.email,
         telefone=payload.telefone
     )
+
+    invalidate_user_cache(request.auth.id)
     
     return 201, {
         "id": cliente.id,
@@ -211,6 +231,8 @@ def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
     cliente.email = payload.email
     cliente.telefone = payload.telefone
     cliente.save()
+
+    invalidate_user_cache(request.auth.id)
     
     return 200, {
         "id": cliente.id,
@@ -245,6 +267,7 @@ def delete_cliente(request, cliente_id: int):
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
         nome = cliente.nome
         cliente.delete()
+        invalidate_user_cache(request.auth.id)
         return 200, {"message": f"Cliente '{nome}' deletado com sucesso"}
     except Cliente.DoesNotExist:
         return 404, {"detail": "Cliente não encontrado"}
