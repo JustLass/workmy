@@ -1,7 +1,10 @@
-# Environment variables
+# Environment variables (local only — Vercel/Render usam painel de env)
 .env
 .env.local
 .env.*.local
+.env.development
+.env.production
+!.env.example
 
 # Python
 __pycache__/

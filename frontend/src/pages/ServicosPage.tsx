@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { Servico } from '../types'
 import { ApiError } from '../lib/http'
+import { PageHeader } from '../shared/ui/PageHeader'
 
 export function ServicosPage() {
   const { request } = useApi()
@@ -52,9 +53,7 @@ export function ServicosPage() {
 
   return (
     <section className="page">
-      <header className="page-header">
-        <h2>Serviços</h2>
-      </header>
+      <PageHeader title="Serviços" description="Catálogo de serviços que você oferece." />
 
       <form className="card form-grid" onSubmit={onSubmit}>
         <label>

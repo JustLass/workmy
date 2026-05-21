@@ -15,13 +15,26 @@ from pathlib import Path
 # My imports
 import os
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
-
-# Carrega o env
-load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Render define RENDER=true no deploy — produção usa só o painel, nunca backend/.env
+ON_RENDER = os.environ.get('RENDER', '').lower() == 'true'
+if not ON_RENDER:
+    load_dotenv(BASE_DIR / '.env', override=False)
+
+_DEV_CORS = (
+    'http://localhost:3000,http://localhost:5173,'
+    'http://127.0.0.1:3000,http://127.0.0.1:5173'
+)
+
+
+def _split_env_list(name: str, default: str = '') -> list[str]:
+    raw = os.environ.get(name, default)
+    return [item.strip() for item in raw.split(',') if item.strip()]
 
 
 # Quick-start development settings - unsuitable for production
@@ -34,10 +47,13 @@ SECRET_KEY = os.environ.get('SECRET_KEY', chave_padrao)
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
-# ALLOWED_HOSTS - usa env sem quebrar desenvolvimento local
-_allowed_hosts_env = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', '').split(',') if h.strip()]
+# ALLOWED_HOSTS — local: env + localhost; Render: só o que está no painel
+_allowed_hosts_env = _split_env_list('ALLOWED_HOSTS')
 _local_hosts = ['localhost', '127.0.0.1']
-ALLOWED_HOSTS = list(dict.fromkeys(_allowed_hosts_env + _local_hosts))
+if ON_RENDER:
+    ALLOWED_HOSTS = _allowed_hosts_env
+else:
+    ALLOWED_HOSTS = list(dict.fromkeys(_allowed_hosts_env + _local_hosts))
 
 
 # Application definition
@@ -166,18 +182,15 @@ LOGIN_REDIRECT_URL = '/'
 # Diz ao Django qual é o nome da rota de login caso um usuário deslogado tente acessar uma página bloqueada
 LOGIN_URL = 'login'
 
-# CORS Configuration
-# Em produção, adicionar no Render: CORS_ALLOWED_ORIGINS=https://seu-frontend.vercel.app,http://localhost:3000
-CORS_ALLOWED_ORIGINS = os.environ.get(
-    'CORS_ALLOWED_ORIGINS',
-    'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173'
-).split(',')
+# CORS — em produção (Render) só variáveis do painel; local usa defaults de dev
+if ON_RENDER:
+    CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS')
+    CSRF_TRUSTED_ORIGINS = _split_env_list('CSRF_TRUSTED_ORIGINS')
+else:
+    CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS', _DEV_CORS)
+    CSRF_TRUSTED_ORIGINS = _split_env_list('CSRF_TRUSTED_ORIGINS', _DEV_CORS)
 
 CORS_ALLOW_CREDENTIALS = True
-CSRF_TRUSTED_ORIGINS = os.environ.get(
-    'CSRF_TRUSTED_ORIGINS',
-    'http://localhost:3000,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:5173'
-).split(',')
 
 # Django Ninja JWT Settings
 from datetime import timedelta
@@ -194,8 +207,27 @@ NINJA_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
+# Validação no Render: deploy falha cedo se o painel estiver incompleto
+if ON_RENDER:
+    _render_required = []
+    if not os.environ.get('DATABASE_URL'):
+        _render_required.append('DATABASE_URL')
+    if not os.environ.get('SECRET_KEY') or SECRET_KEY == chave_padrao:
+        _render_required.append('SECRET_KEY (chave forte no painel Render)')
+    if not _allowed_hosts_env:
+        _render_required.append('ALLOWED_HOSTS (ex.: seu-app.onrender.com)')
+    if not CORS_ALLOWED_ORIGINS:
+        _render_required.append('CORS_ALLOWED_ORIGINS (URL do Vercel)')
+    if not CSRF_TRUSTED_ORIGINS:
+        _render_required.append('CSRF_TRUSTED_ORIGINS')
+    if DEBUG:
+        _render_required.append('DEBUG=False')
+    if _render_required:
+        raise ImproperlyConfigured(
+            'Variáveis obrigatórias no painel Render: ' + ', '.join(_render_required)
+        )
+
 # Security Settings for Production
-ON_RENDER = os.environ.get('RENDER', '').lower() == 'true'
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     SECURE_SSL_REDIRECT = os.environ.get('SECURE_SSL_REDIRECT', 'True' if ON_RENDER else 'False') == 'True'

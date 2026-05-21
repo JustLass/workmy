@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi'
 import type { Pagamento, Projeto } from '../types'
 import { ApiError } from '../lib/http'
 import { formatCurrency, formatDate } from '../lib/format'
+import { PageHeader } from '../shared/ui/PageHeader'
 
 export function PagamentosPage() {
   const { request } = useApi()
@@ -117,9 +118,7 @@ export function PagamentosPage() {
 
   return (
     <section className="page">
-      <header className="page-header">
-        <h2>Pagamentos</h2>
-      </header>
+      <PageHeader title="Financeiro" description="Histórico e registro de pagamentos." />
 
       <form className="card form-grid" onSubmit={onSubmit}>
         <label>

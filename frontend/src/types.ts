@@ -33,7 +33,19 @@ export type Projeto = {
   cliente_nome: string
   servico_id: number
   servico_nome: string
+  mensalista: boolean
+  valor_mensal: string | null
+  dia_vencimento: number
+  recorrencia_inicio: string | null
   criado_em: string
+}
+
+export type MensalistaResponse = {
+  mensalista: boolean
+  valor_mensal: string | null
+  dia_vencimento: number
+  recorrencia_inicio: string | null
+  geracao?: { criados: number; existentes: number; referencias: string[] } | null
 }
 
 export type Pagamento = {

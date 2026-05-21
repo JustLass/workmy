@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -o errexit
 
+# Build no Render — sem segredos aqui; variáveis vêm do painel Environment.
 # Instala dependências com uv (fallback para pip)
 if command -v uv >/dev/null 2>&1; then
   uv sync --frozen --active

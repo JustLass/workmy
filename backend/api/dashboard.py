@@ -126,23 +126,24 @@ def dashboard_mensal(
     total_recebido = agregados['total'] or Decimal('0.00')
     total_pagamentos = agregados['quantidade'] or 0
 
-    pagamentos_recorrentes = Pagamento.objects.filter(
-        projeto_id__in=projetos_ids,
-        tipo_pagamento__in=['MENSAL', 'QUINZENAL']
-    ).select_related('projeto', 'projeto__cliente')
-
+    # Previsto = soma dos contratos mensalistas ativos (não histórico de parcelas)
+    projetos_mensalistas = Projeto.objects.filter(
+        usuario=request.auth,
+        mensalista=True,
+        valor_mensal__isnull=False,
+    )
     if filtros.cliente_id:
-        pagamentos_recorrentes = pagamentos_recorrentes.filter(projeto__cliente_id=filtros.cliente_id)
-    if tipo_pagamento:
-        if tipo_pagamento == "AVULSO":
-            pagamentos_recorrentes = Pagamento.objects.none()
-        else:
-            pagamentos_recorrentes = pagamentos_recorrentes.filter(tipo_pagamento=tipo_pagamento)
+        projetos_mensalistas = projetos_mensalistas.filter(cliente_id=filtros.cliente_id)
 
     previsto_proximo_mes_decimal = sum(
-        [p.valor * 2 if p.tipo_pagamento == 'QUINZENAL' else p.valor for p in pagamentos_recorrentes],
-        Decimal('0.00')
+        (p.valor_mensal for p in projetos_mensalistas),
+        Decimal('0.00'),
     )
+
+    if tipo_pagamento == 'AVULSO':
+        previsto_proximo_mes_decimal = Decimal('0.00')
+    elif tipo_pagamento == 'QUINZENAL':
+        previsto_proximo_mes_decimal = previsto_proximo_mes_decimal * 2
     
     # Agrupa por cliente
     clientes_map = {}

@@ -98,7 +98,27 @@ class ProjetoOutSchema(Schema):
     cliente_nome: str = Field(..., description="Nome do cliente")
     servico_id: int = Field(..., description="ID do serviço")
     servico_nome: str = Field(..., description="Nome do serviço")
+    mensalista: bool = Field(False, description="Recorrência mensal ativa")
+    valor_mensal: Optional[str] = Field(None, description="Valor das parcelas automáticas")
+    dia_vencimento: int = Field(5, description="Dia de vencimento (1-28)")
+    recorrencia_inicio: Optional[str] = Field(None, description="Início da recorrência (YYYY-MM-DD)")
     criado_em: str = Field(..., description="Data de criação")
+
+
+class MensalistaInSchema(Schema):
+    """Ativar/desativar plano mensal de um contrato"""
+    ativo: bool = Field(..., description="True para mensalista, False para encerrar recorrência")
+    valor_mensal: Optional[Decimal] = Field(None, gt=0, description="Valor mensal (obrigatório ao ativar se não houver histórico)")
+    dia_vencimento: Optional[int] = Field(None, ge=1, le=28, description="Dia de vencimento")
+    recorrencia_inicio: Optional[date] = Field(None, description="Primeiro mês da geração automática")
+
+
+class MensalistaOutSchema(Schema):
+    mensalista: bool
+    valor_mensal: Optional[str] = None
+    dia_vencimento: int
+    recorrencia_inicio: Optional[str] = None
+    geracao: Optional[dict] = None
 
 
 # ============ PAGAMENTO ============

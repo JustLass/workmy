@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi'
 import type { Cliente } from '../types'
 import { ApiError } from '../lib/http'
 import { formatCurrency } from '../lib/format'
+import { PageHeader } from '../shared/ui/PageHeader'
 
 export function ClientesPage() {
   const { request } = useApi()
@@ -104,9 +105,7 @@ export function ClientesPage() {
 
   return (
     <section className="page">
-      <header className="page-header">
-        <h2>Clientes</h2>
-      </header>
+      <PageHeader title="Clientes" description="Gerencie sua base de clientes." />
 
       <form className="card form-grid" onSubmit={onSubmit}>
         <label>

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { useApi } from '../hooks/useApi'
-import type { Cliente, DashboardMensal } from '../types'
-import { ApiError } from '../lib/http'
+import { useResourceQuery } from '../hooks/useResourceQuery'
+import type { Cliente, DashboardMensal, Pagamento, Projeto } from '../types'
 import { formatCurrency } from '../lib/format'
 import { StatCard } from '../components/StatCard'
+import { PageHeader } from '../shared/ui/PageHeader'
+import { CarteiraList } from '../features/dashboard/CarteiraList'
 
 type Filters = {
   mes: string
@@ -14,7 +15,6 @@ type Filters = {
 }
 
 export function DashboardPage() {
-  const { request } = useApi()
   const now = new Date()
   const [filters, setFilters] = useState<Filters>({
     mes: String(now.getMonth() + 1),
@@ -22,142 +22,191 @@ export function DashboardPage() {
     cliente_id: '',
     tipo_pagamento: '',
   })
-  const [data, setData] = useState<DashboardMensal | null>(null)
-  const [clientes, setClientes] = useState<Cliente[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  const [showFinanceiro, setShowFinanceiro] = useState(false)
 
-  const load = useCallback(async (current: Filters) => {
-    setLoading(true)
-    setError('')
-    try {
-      const payload = await request<DashboardMensal>('/dashboard/mensal', {
-        query: {
-          mes: current.mes ? Number(current.mes) : undefined,
-          ano: current.ano ? Number(current.ano) : undefined,
-          cliente_id: current.cliente_id ? Number(current.cliente_id) : undefined,
-          tipo_pagamento: current.tipo_pagamento || undefined,
-        },
-      })
-      setData(payload)
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Erro ao carregar dashboard')
-    } finally {
-      setLoading(false)
-    }
-  }, [request])
+  const {
+    data: projetos,
+    loading: loadingProjetos,
+    reload: reloadProjetos,
+  } = useResourceQuery<Projeto[]>('/projetos/', {
+    watchScopes: ['/projetos/', '/pagamentos/'],
+  })
 
-  useEffect(() => {
-    void request<Cliente[]>('/clientes/')
-      .then(setClientes)
-      .catch(() => setClientes([]))
+  const {
+    data: pagamentos,
+    reload: reloadPagamentos,
+  } = useResourceQuery<Pagamento[]>('/pagamentos/', {
+    watchScopes: ['/pagamentos/', '/projetos/'],
+  })
 
-    const today = new Date()
-      void load({
-        mes: String(today.getMonth() + 1),
-        ano: String(today.getFullYear()),
-        cliente_id: '',
-        tipo_pagamento: '',
-      })
-  }, [load, request])
+  const financeiroQuery = useMemo(
+    () => ({
+      mes: filters.mes ? Number(filters.mes) : undefined,
+      ano: filters.ano ? Number(filters.ano) : undefined,
+      cliente_id: filters.cliente_id ? Number(filters.cliente_id) : undefined,
+      tipo_pagamento: filters.tipo_pagamento || undefined,
+    }),
+    [filters.mes, filters.ano, filters.cliente_id, filters.tipo_pagamento],
+  )
+
+  const {
+    data,
+    loading: loadingFinanceiro,
+    error,
+    reload: reloadFinanceiro,
+  } = useResourceQuery<DashboardMensal>('/dashboard/mensal', {
+    query: financeiroQuery,
+    watchScopes: ['/dashboard/mensal', '/pagamentos/', '/projetos/'],
+    enabled: showFinanceiro,
+  })
+
+  const { data: clientes = [] } = useResourceQuery<Cliente[]>('/clientes/', {
+    watchScopes: ['/clientes/'],
+    cacheTtlMs: null,
+  })
+
+  const refreshCarteira = useCallback(() => {
+    reloadProjetos()
+    reloadPagamentos()
+  }, [reloadProjetos, reloadPagamentos])
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault()
-    await load(filters)
+    reloadFinanceiro()
   }
+
+  const loading = loadingProjetos && !projetos?.length
 
   return (
     <section className="page">
-      <header className="page-header">
-        <h2>Dashboard</h2>
-        <p className="muted">Painel financeiro com visão consolidada e previsão.</p>
-      </header>
-
-      <form className="card filter-grid" onSubmit={onSubmit}>
-        <label>
-          Mês
-          <input
-            type="number"
-            min={1}
-            max={12}
-            value={filters.mes}
-            onChange={(e) => setFilters((prev) => ({ ...prev, mes: e.target.value }))}
-          />
-        </label>
-        <label>
-          Ano
-          <input
-            type="number"
-            min={2000}
-            value={filters.ano}
-            onChange={(e) => setFilters((prev) => ({ ...prev, ano: e.target.value }))}
-          />
-        </label>
-        <label>
-          Cliente
-          <select
-            value={filters.cliente_id}
-            onChange={(e) => setFilters((prev) => ({ ...prev, cliente_id: e.target.value }))}
-          >
-            <option value="">Todos</option>
-            {clientes.map((cliente) => (
-              <option key={cliente.id} value={cliente.id}>
-                {cliente.nome}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Tipo de pagamento
-          <select
-            value={filters.tipo_pagamento}
-            onChange={(e) => setFilters((prev) => ({ ...prev, tipo_pagamento: e.target.value }))}
-          >
-            <option value="">Todos</option>
-            <option value="MENSAL">Mensal</option>
-            <option value="QUINZENAL">Quinzenal</option>
-            <option value="AVULSO">Avulso</option>
-          </select>
-        </label>
-        <button className="btn" type="submit" disabled={loading}>
-          {loading ? 'Carregando...' : 'Atualizar'}
-        </button>
-      </form>
+      <PageHeader
+        title="Início"
+        description="Sua carteira de contratos e resumo financeiro do mês."
+      />
 
       {error && <p className="error">{error}</p>}
 
-      {data && (
-        <>
-          <div className="stats-grid">
-            <StatCard label="Total recebido" value={formatCurrency(data.total_recebido)} />
-            <StatCard label="Previsto próximo mês" value={formatCurrency(data.previsto_proximo_mes)} />
-            <StatCard label="Pagamentos" value={data.total_pagamentos} />
-            <StatCard label="Clientes ativos" value={data.clientes_ativos} />
+      <article className="card card-padded-lg">
+        <h3 className="section-title">Minha carteira</h3>
+        {loading ? (
+          <div className="boot-loader" style={{ minHeight: 120 }}>
+            <div className="spinner" aria-hidden />
+            <p className="muted">Carregando contratos...</p>
           </div>
+        ) : (
+          <CarteiraList
+            projetos={projetos ?? []}
+            pagamentos={pagamentos ?? []}
+            onRefresh={refreshCarteira}
+          />
+        )}
+      </article>
 
-          <article className="card">
-            <h3>Receita por cliente</h3>
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>Cliente</th>
-                  <th>Pagamentos</th>
-                  <th>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.por_cliente.map((row) => (
-                  <tr key={row.cliente_id}>
-                    <td>{row.cliente_nome}</td>
-                    <td>{row.quantidade_pagamentos}</td>
-                    <td>{formatCurrency(row.total)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </article>
-        </>
-      )}
+      <article className="card">
+        <button
+          type="button"
+          className="btn btn-ghost"
+          style={{ width: '100%', justifyContent: 'space-between', display: 'flex' }}
+          onClick={() => setShowFinanceiro((v) => !v)}
+          aria-expanded={showFinanceiro}
+        >
+          <span>Resumo financeiro do mês</span>
+          <span aria-hidden>{showFinanceiro ? '▲' : '▼'}</span>
+        </button>
+
+        {showFinanceiro && (
+          <>
+            <hr className="section-divider" />
+            <form className="filter-grid" onSubmit={onSubmit}>
+              <label>
+                Mês
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={filters.mes}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, mes: e.target.value }))}
+                />
+              </label>
+              <label>
+                Ano
+                <input
+                  type="number"
+                  min={2000}
+                  value={filters.ano}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, ano: e.target.value }))}
+                />
+              </label>
+              <label>
+                Cliente
+                <select
+                  value={filters.cliente_id}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, cliente_id: e.target.value }))}
+                >
+                  <option value="">Todos</option>
+                  {(clientes ?? []).map((cliente) => (
+                    <option key={cliente.id} value={cliente.id}>
+                      {cliente.nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Recorrência
+                <select
+                  value={filters.tipo_pagamento}
+                  onChange={(e) =>
+                    setFilters((prev) => ({ ...prev, tipo_pagamento: e.target.value }))
+                  }
+                >
+                  <option value="">Todas</option>
+                  <option value="MENSAL">Mensal</option>
+                  <option value="QUINZENAL">Quinzenal</option>
+                  <option value="AVULSO">Avulso</option>
+                </select>
+              </label>
+              <button className="btn" type="submit" disabled={loadingFinanceiro}>
+                {loadingFinanceiro ? 'Atualizando...' : 'Atualizar'}
+              </button>
+            </form>
+
+            {data && (
+              <>
+                <div className="stats-grid" style={{ marginTop: 16 }}>
+                  <StatCard label="Total recebido" value={formatCurrency(data.total_recebido)} />
+                  <StatCard
+                    label="Previsto próximo mês"
+                    value={formatCurrency(data.previsto_proximo_mes)}
+                  />
+                  <StatCard label="Pagamentos" value={data.total_pagamentos} />
+                  <StatCard label="Clientes ativos" value={data.clientes_ativos} />
+                </div>
+
+                <div className="table-wrap" style={{ marginTop: 12 }}>
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Cliente</th>
+                        <th>Pagamentos</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.por_cliente.map((row) => (
+                        <tr key={row.cliente_id}>
+                          <td>{row.cliente_nome}</td>
+                          <td>{row.quantidade_pagamentos}</td>
+                          <td>{formatCurrency(row.total)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </article>
     </section>
   )
 }

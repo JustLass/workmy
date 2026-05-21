@@ -1,6 +1,6 @@
 import { API_BASE_URL } from '../config'
 
-type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE'
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
 const normalizeBody = (body: unknown) => {
   if (!body || typeof body !== 'object') return undefined
@@ -72,8 +72,13 @@ export async function http<T>(
 
   let body: BodyInit | undefined
   if (options?.body) {
-    body = normalizeBody(options.body)
-    headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    if (method === 'PATCH') {
+      body = JSON.stringify(options.body)
+      headers['Content-Type'] = 'application/json'
+    } else {
+      body = normalizeBody(options.body)
+      headers['Content-Type'] = 'application/x-www-form-urlencoded'
+    }
   }
 
   const res = await fetch(url, {

@@ -1,52 +1,48 @@
 # Integração Front (Vercel) + API (Render)
 
-## Arquitetura recomendada
+## Arquitetura
 
-- Frontend no **Vercel**.
-- Backend Django API no **Render**.
-- Front chama API via HTTPS (`/api/...`).
-- Auth com JWT (`access` + `refresh`).
+- Frontend no **Vercel** (deploy automático no push)
+- Backend Django no **Render** (deploy automático no push)
+- Configuração crítica **somente nos painéis** — ver [AMBIENTES.md](./AMBIENTES.md)
 
 ## Fluxo
 
-1. Usuário acessa front no Vercel.
-2. Front chama `POST /api/auth/login` no Render.
-3. Backend retorna tokens JWT.
-4. Front envia `Authorization: Bearer <access>` nas rotas protegidas.
-5. Quando expirar, front usa `POST /api/auth/refresh`.
+1. Usuário acessa o front no Vercel
+2. Front chama `POST /api/auth/login` no Render
+3. Backend retorna JWT
+4. Front envia `Authorization: Bearer <access>`
+5. Refresh via `POST /api/auth/refresh`
 
-## Variáveis no Render (backend)
+## Variáveis no Render (painel — não no repositório)
 
-Configurar no painel do Render:
+```
+DEBUG=False
+SECRET_KEY=<chave forte>
+DATABASE_URL=<url do banco>
+ALLOWED_HOSTS=workmy.onrender.com
+CORS_ALLOWED_ORIGINS=https://SEU_FRONT.vercel.app
+CSRF_TRUSTED_ORIGINS=https://SEU_FRONT.vercel.app,https://workmy.onrender.com
+```
 
-- `DEBUG=False`
-- `SECRET_KEY=<chave forte>`
-- `DATABASE_URL=<url do banco>`
-- `ALLOWED_HOSTS=workmy.onrender.com`
-- `CORS_ALLOWED_ORIGINS=https://SEU_FRONT.vercel.app`
-- `CSRF_TRUSTED_ORIGINS=https://SEU_FRONT.vercel.app,https://workmy.onrender.com`
+O Render define `RENDER=true` automaticamente.
 
-## Variáveis no Vercel (frontend)
+## Variáveis no Vercel (painel — não no repositório)
 
-Configurar no projeto do Vercel:
+```
+VITE_API_BASE_URL=https://workmy.onrender.com/api
+VITE_DEMO_MODE=false
+```
 
-- `NEXT_PUBLIC_API_URL=https://workmy.onrender.com/api`
+## Código
 
-Se usar Vite:
-
-- `VITE_API_URL=https://workmy.onrender.com/api`
-
-## Ajuste no frontend
-
-Centralize a URL base da API:
-
-- Axios/fetch sempre usando `process.env.NEXT_PUBLIC_API_URL` (ou `VITE_API_URL`).
-- Não hardcode `localhost` em produção.
+- `frontend/src/config.ts` — lê `import.meta.env.VITE_*`
+- `backend/core/settings.py` — lê `os.environ`; ignora `.env` no Render
 
 ## Checklist de validação
 
-1. `https://workmy.onrender.com/api/docs` abre.
-2. Login via front retorna token.
-3. Requisição autenticada funciona (`/api/auth/me`).
-4. CORS sem erro no navegador.
-5. Refresh token funcionando.
+1. `https://workmy.onrender.com/api/docs` abre
+2. Login no front retorna token
+3. `/api/auth/me` autenticado funciona
+4. Sem erro de CORS no navegador
+5. Refresh token ok

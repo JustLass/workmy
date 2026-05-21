@@ -1,6 +1,10 @@
 import { createContext, useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { IS_DEMO_MODE } from '../config'
+import { demoRequest } from '../demo/demoApi'
+import { resetDemoStore } from '../demo/demoStore'
 import { http } from '../lib/http'
+import { clearApiCache } from '../shared/lib/cache'
 import type { TokenResponse, User } from '../types'
 
 type AuthContextData = {
@@ -62,6 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const login = useCallback(async (username: string, password: string) => {
+    if (IS_DEMO_MODE) {
+      const payload = await demoRequest<TokenResponse>('/auth/login', {
+        method: 'POST',
+        body: { username, password: password || 'demo' },
+      })
+      persist(payload)
+      return
+    }
     const payload = await http<TokenResponse>('/auth/login', {
       method: 'POST',
       body: { username, password },
@@ -75,6 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string
     telefone?: string
   }) => {
+    if (IS_DEMO_MODE) {
+      const response = await demoRequest<TokenResponse>('/auth/register', {
+        method: 'POST',
+        body: payload,
+      })
+      persist(response)
+      return
+    }
     const response = await http<TokenResponse>('/auth/register', {
       method: 'POST',
       body: payload,
@@ -87,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccessToken(null)
     setRefreshToken(null)
     localStorage.removeItem(STORAGE_KEY)
+    clearApiCache()
+    if (IS_DEMO_MODE) resetDemoStore()
   }, [])
 
   const value = useMemo<AuthContextData>(

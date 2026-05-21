@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from gestao_freelas.models import Pagamento, Projeto
 from api.schemas import PagamentoInSchema, PagamentoOutSchema, ErrorSchema, MessageSchema
 from api.auth import AuthBearer
+from api.realtime import publish
 
 router = Router(tags=["Pagamentos"], auth=AuthBearer())
 
@@ -130,6 +131,8 @@ def create_pagamento(request, payload: Form[PagamentoInSchema]):
         data=payload.data,
         observacao=payload.observacao
     )
+
+    publish(request.auth.id, 'pagamentos', 'created', meta={'pagamento_id': pagamento.id, 'projeto_id': projeto.id})
     
     return 201, {
         "id": pagamento.id,
@@ -202,6 +205,8 @@ def update_pagamento(request, pagamento_id: int):
     pagamento.data = payload.data
     pagamento.observacao = payload.observacao
     pagamento.save()
+
+    publish(request.auth.id, 'pagamentos', 'updated', meta={'pagamento_id': pagamento.id, 'projeto_id': projeto.id})
     
     return 200, {
         "id": pagamento.id,
@@ -235,7 +240,9 @@ def delete_pagamento(request, pagamento_id: int):
             projeto_id__in=projetos_ids
         )
         descricao = f"Pagamento de R$ {pagamento.valor} - {pagamento.projeto.cliente.nome}"
+        projeto_id = pagamento.projeto_id
         pagamento.delete()
+        publish(request.auth.id, 'pagamentos', 'deleted', meta={'projeto_id': projeto_id})
         return 200, {"message": f"{descricao} deletado com sucesso"}
     except Pagamento.DoesNotExist:
         return 404, {"detail": "Pagamento não encontrado"}
