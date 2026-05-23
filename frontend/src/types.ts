@@ -38,6 +38,12 @@ export type Projeto = {
   dia_vencimento: number
   recorrencia_inicio: string | null
   criado_em: string
+  status: 'DISCOVERY' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED'
+  progresso: number
+  data_entrega?: string | null
+  valor?: string | null
+  tipo_recorrencia: 'MENSAL' | 'QUINZENAL' | 'AVULSO'
+  ativo: boolean
 }
 
 export type MensalistaResponse = {

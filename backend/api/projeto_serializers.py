@@ -3,6 +3,8 @@ from gestao_freelas.models import Projeto
 
 
 def projeto_to_dict(projeto: Projeto) -> dict:
+    from gestao_freelas.services.recorrencia import obter_ou_criar_ativo
+    ativo_info = obter_ou_criar_ativo(projeto)
     return {
         'id': projeto.id,
         'cliente_id': projeto.cliente_id,
@@ -14,4 +16,12 @@ def projeto_to_dict(projeto: Projeto) -> dict:
         'dia_vencimento': projeto.dia_vencimento,
         'recorrencia_inicio': projeto.recorrencia_inicio.isoformat() if projeto.recorrencia_inicio else None,
         'criado_em': projeto.criado_em.isoformat(),
+        # Novos campos
+        'status': projeto.status,
+        'progresso': projeto.progresso,
+        'data_entrega': projeto.data_entrega.isoformat() if projeto.data_entrega else None,
+        'valor': str(projeto.valor) if projeto.valor is not None else None,
+        'tipo_recorrencia': ativo_info.tipo_recorrencia,
+        'ativo': ativo_info.ativo,
     }
+

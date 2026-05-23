@@ -7,6 +7,7 @@ from django.shortcuts import get_object_or_404
 from django.db.models import Sum, Value, DecimalField
 from django.db.models.functions import Coalesce
 from gestao_freelas.models import Cliente, Servico, Projeto, Pagamento
+from api.projeto_serializers import projeto_to_dict
 from api.schemas import (
     ClienteInSchema,
     ClienteOutSchema,
@@ -150,14 +151,7 @@ def get_cliente_detalhe(request, cliente_id: int):
             for s in servicos
         ],
         "projetos": [
-            {
-                "id": p.id,
-                "cliente_id": p.cliente.id,
-                "cliente_nome": p.cliente.nome,
-                "servico_id": p.servico.id,
-                "servico_nome": p.servico.nome,
-                "criado_em": p.criado_em.isoformat(),
-            }
+            projeto_to_dict(p)
             for p in projetos
         ],
         "pagamentos": [
@@ -252,12 +246,13 @@ def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
     }
 
 
-@router.delete("/{cliente_id}", response={200: MessageSchema, 404: ErrorSchema}, summary="Deletar cliente")
+@router.delete("/{cliente_id}", response={200: MessageSchema, 404: ErrorSchema, 409: ErrorSchema}, summary="Deletar cliente")
 def delete_cliente(request, cliente_id: int):
     """
     Deleta um cliente do usuário autenticado.
     
-    **ATENÇÃO:** Isso irá deletar também todos os projetos e pagamentos relacionados!
+    **ATENÇÃO:** Só é possível deletar cliente sem projetos associados!
+    Se houver projetos, retorna erro 409 (Conflict).
     
     - **cliente_id**: ID do cliente a ser deletado
     
@@ -265,9 +260,18 @@ def delete_cliente(request, cliente_id: int):
     """
     try:
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
-        nome = cliente.nome
-        cliente.delete()
-        invalidate_user_cache(request.auth.id)
-        return 200, {"message": f"Cliente '{nome}' deletado com sucesso"}
     except Cliente.DoesNotExist:
         return 404, {"detail": "Cliente não encontrado"}
+    
+    # Verifica se há projetos associados
+    projetos_count = cliente.projetos.count()
+    if projetos_count > 0:
+        return 409, {
+            "detail": f"Não é possível deletar cliente com {projetos_count} projeto(s) associado(s). "
+                      "Delete os projetos primeiro."
+        }
+    
+    nome = cliente.nome
+    cliente.delete()
+    invalidate_user_cache(request.auth.id)
+    return 200, {"message": f"Cliente '{nome}' deletado com sucesso"}

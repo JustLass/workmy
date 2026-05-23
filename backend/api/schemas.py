@@ -89,6 +89,12 @@ class ProjetoInSchema(Schema):
     
     cliente_id: int = Field(..., description="ID do cliente", title="ID do cliente")
     servico_id: int = Field(..., description="ID do serviço", title="ID do serviço")
+    status: Optional[str] = Field("DISCOVERY", description="Etapa atual do projeto no Kanban")
+    progresso: Optional[int] = Field(0, description="Progresso de 0 a 100")
+    data_entrega: Optional[date] = Field(None, description="Prazo de entrega")
+    valor: Optional[Decimal] = Field(None, description="Valor total do projeto")
+    tipo_recorrencia: Optional[str] = Field("AVULSO", description="Tipo de recorrência: MENSAL, QUINZENAL, AVULSO")
+    ativo: Optional[bool] = Field(True, description="Indica se a recorrência está ativa")
 
 
 class ProjetoOutSchema(Schema):
@@ -103,6 +109,13 @@ class ProjetoOutSchema(Schema):
     dia_vencimento: int = Field(5, description="Dia de vencimento (1-28)")
     recorrencia_inicio: Optional[str] = Field(None, description="Início da recorrência (YYYY-MM-DD)")
     criado_em: str = Field(..., description="Data de criação")
+    status: str = Field(..., description="Status atual no Kanban")
+    progresso: int = Field(..., description="Progresso em %")
+    data_entrega: Optional[str] = Field(None, description="Prazo de entrega")
+    valor: Optional[str] = Field(None, description="Valor total do projeto")
+    tipo_recorrencia: str = Field(..., description="Tipo de recorrência")
+    ativo: bool = Field(..., description="Indica se a recorrência está ativa")
+
 
 
 class MensalistaInSchema(Schema):

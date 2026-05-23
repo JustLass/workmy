@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { Servico } from '../types'
 import { ApiError } from '../lib/http'
-import { PageHeader } from '../shared/ui/PageHeader'
 
 export function ServicosPage() {
   const { request } = useApi()
@@ -43,6 +42,7 @@ export function ServicosPage() {
   }
 
   const onDelete = async (id: number) => {
+    if (!window.confirm('Excluir este serviço? Todos os contratos associados podem ser afetados.')) return
     const snapshot = items
     setItems((prev) => prev.filter((item) => item.id !== id))
     setError('')
@@ -55,83 +55,99 @@ export function ServicosPage() {
   }
 
   return (
-    <section className="page">
-      <PageHeader title="Serviços" description="Catálogo de serviços que você oferece." />
+    <div className="font-body-md text-body-md">
+      {/* Header Section */}
+      <section className="mb-xl flex flex-col md:flex-row md:items-end justify-between gap-lg">
+        <div>
+          <h2 className="font-headline-md text-display-lg text-primary mb-xs font-bold text-2xl">Serviços Oferecidos</h2>
+          <p className="text-secondary font-body-lg">
+            Seu catálogo de especialidades e serviços para contratos.
+          </p>
+        </div>
+      </section>
 
-      <form className="card form-grid" onSubmit={onSubmit}>
-        <label>
-          Nome
+      {/* Form Section */}
+      <form className="organic-card p-lg rounded-xl mb-xl bg-white border border-outline-variant/30 flex flex-col md:flex-row gap-md items-end" onSubmit={onSubmit}>
+        <label className="block text-sm font-semibold text-outline flex-1">
+          Nome do Serviço
           <input
             required
+            placeholder="Ex: Consultoria Técnica, Web Design"
+            className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
             value={form.nome}
             onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
           />
         </label>
-        <label>
-          Descrição
+        <label className="block text-sm font-semibold text-outline flex-1">
+          Descrição Detalhada (Opcional)
           <input
+            placeholder="Ex: Planejamento, UI/UX e desenvolvimento front-end..."
+            className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
             value={form.descricao}
             onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))}
           />
         </label>
-        <button className="btn" type="submit" disabled={loading}>
-          {loading ? 'Salvando...' : 'Adicionar serviço'}
+        <button className="bg-primary text-on-primary font-bold py-sm px-lg h-[46px] rounded-xl flex items-center justify-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-md select-none shrink-0" type="submit" disabled={loading}>
+          <span className="material-symbols-outlined">add_circle</span>
+          {loading ? 'Salvando...' : 'Adicionar Serviço'}
         </button>
       </form>
 
-      {error && <p className="error">{error}</p>}
+      {error && <p className="error mb-md text-error bg-error-container/40 p-sm rounded-lg border border-error-container">{error}</p>}
 
-      <article className="card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Nome</th>
-              <th>Descrição</th>
-              <th>Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => (
-              <tr key={item.id}>
-                <td>{item.nome}</td>
-                <td>{item.descricao || '-'}</td>
-                <td className="table-action">
-                  <div className="inline-actions">
-                    <Link
-                      className="btn btn-open icon-btn"
-                      to={`/servicos/${item.id}`}
-                      state={{ servicoNome: item.nome }}
-                      aria-label="Abrir serviço"
-                      title="Abrir serviço"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          d="M12 5C6.5 5 2.1 8.6 1 12c1.1 3.4 5.5 7 11 7s9.9-3.6 11-7c-1.1-3.4-5.5-7-11-7Zm0 11a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </Link>
-                    <button
-                      type="button"
-                      className="btn btn-delete icon-btn"
-                      onClick={() => void onDelete(item.id)}
-                      aria-label="Excluir serviço"
-                      title="Excluir serviço"
-                    >
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path
-                          d="M9 3h6l1 2h4v2H4V5h4l1-2Zm1 6h2v9h-2V9Zm4 0h2v9h-2V9ZM7 9h2v9H7V9Z"
-                          fill="currentColor"
-                        />
-                      </svg>
-                    </button>
-                  </div>
-                </td>
+      {/* Table Section */}
+      <article className="organic-card rounded-xl overflow-hidden bg-white shadow-sm border border-outline-variant/30">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10">
+                <th className="px-lg py-md font-semibold">Nome do Serviço</th>
+                <th className="px-lg py-md font-semibold">Descrição</th>
+                <th className="px-lg py-md text-right font-semibold">Ações</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="text-body-md divide-y divide-outline-variant/20">
+              {items.map((item) => (
+                <tr key={item.id} className="hover:bg-primary-fixed/5 transition-all">
+                  <td className="px-lg py-lg font-bold text-on-surface">
+                    {item.nome}
+                  </td>
+                  <td className="px-lg py-lg text-on-surface-variant font-medium">
+                    {item.descricao || '-'}
+                  </td>
+                  <td className="px-lg py-lg text-right">
+                    <div className="flex gap-md justify-end items-center">
+                      <Link
+                        to={`/servicos/${item.id}`}
+                        state={{ servicoNome: item.nome }}
+                        className="material-symbols-outlined text-on-surface-variant hover:text-primary transition-all text-[20px]"
+                        title="Visualizar serviço"
+                      >
+                        visibility
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => void onDelete(item.id)}
+                        className="material-symbols-outlined text-outline hover:text-error transition-all text-[20px]"
+                        title="Excluir serviço"
+                      >
+                        delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={3} className="text-center py-lg text-secondary">
+                    Nenhum serviço oferecido cadastrado.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </article>
-    </section>
+    </div>
   )
 }

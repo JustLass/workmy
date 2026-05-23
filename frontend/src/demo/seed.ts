@@ -91,6 +91,10 @@ export function createDemoSeed(): {
       dia_vencimento: 5,
       recorrencia_inicio: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
       criado_em: iso(45),
+      status: 'IN_PROGRESS',
+      progresso: 65,
+      tipo_recorrencia: 'MENSAL',
+      ativo: true,
     },
     {
       id: 2,
@@ -103,6 +107,10 @@ export function createDemoSeed(): {
       dia_vencimento: 10,
       recorrencia_inicio: null,
       criado_em: iso(40),
+      status: 'DISCOVERY',
+      progresso: 15,
+      tipo_recorrencia: 'QUINZENAL',
+      ativo: true,
     },
     {
       id: 3,
@@ -115,6 +123,10 @@ export function createDemoSeed(): {
       dia_vencimento: 5,
       recorrencia_inicio: null,
       criado_em: iso(20),
+      status: 'REVIEW',
+      progresso: 90,
+      tipo_recorrencia: 'AVULSO',
+      ativo: false,
     },
   ]
 

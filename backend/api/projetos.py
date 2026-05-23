@@ -68,10 +68,36 @@ def create_projeto(request, payload: Form[ProjetoInSchema]):
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado ou não pertence a você"}
 
-    if Projeto.objects.filter(usuario=request.auth, cliente=cliente, servico=servico).exists():
-        return 400, {"detail": "Já existe um projeto com este cliente e serviço"}
+    tipo_rec = payload.tipo_recorrencia or 'AVULSO'
+    ativo_rec = payload.ativo if payload.ativo is not None else True
+    if tipo_rec in ['MENSAL', 'QUINZENAL'] and ativo_rec:
+        colisao = Projeto.objects.filter(
+            usuario=request.auth,
+            cliente=cliente,
+            servico=servico,
+            projeto_ativo__ativo=True,
+            projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']
+        ).exists()
+        if colisao:
+            return 400, {"detail": "Já existe um contrato com recorrência ativa para este cliente e serviço. Novos contratos com recorrência ativa são bloqueados. Por favor, adicione como tipo Avulso."}
 
-    projeto = Projeto.objects.create(usuario=request.auth, cliente=cliente, servico=servico)
+    projeto = Projeto.objects.create(
+        usuario=request.auth,
+        cliente=cliente,
+        servico=servico,
+        status=payload.status or 'DISCOVERY',
+        progresso=payload.progresso or 0,
+        data_entrega=payload.data_entrega,
+        valor=payload.valor,
+    )
+    
+    # Configura o ProjetoAtivo
+    from gestao_freelas.services.recorrencia import obter_ou_criar_ativo
+    ativo_info = obter_ou_criar_ativo(projeto)
+    ativo_info.tipo_recorrencia = payload.tipo_recorrencia or 'AVULSO'
+    ativo_info.ativo = payload.ativo if payload.ativo is not None else True
+    ativo_info.save()
+
     publish(request.auth.id, 'projetos', 'created', meta={'projeto_id': projeto.id})
     invalidate_user_cache(request.auth.id)
 
@@ -95,17 +121,71 @@ def update_projeto(request, projeto_id: int, payload: Form[ProjetoInSchema]):
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado ou não pertence a você"}
 
-    if Projeto.objects.filter(usuario=request.auth, cliente=cliente, servico=servico).exclude(id=projeto_id).exists():
-        return 400, {"detail": "Já existe outro projeto com este cliente e serviço"}
+    tipo_rec = payload.tipo_recorrencia or 'AVULSO'
+    ativo_rec = payload.ativo if payload.ativo is not None else True
+    if tipo_rec in ['MENSAL', 'QUINZENAL'] and ativo_rec:
+        colisao = Projeto.objects.filter(
+            usuario=request.auth,
+            cliente=cliente,
+            servico=servico,
+            projeto_ativo__ativo=True,
+            projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']
+        ).exclude(id=projeto_id).exists()
+        if colisao:
+            return 400, {"detail": "Já existe outro contrato com recorrência ativa para este cliente e serviço. Por favor, configure este contrato como tipo Avulso."}
 
     projeto.cliente = cliente
     projeto.servico = servico
+    if payload.status:
+        projeto.status = payload.status
+    if payload.progresso is not None:
+        projeto.progresso = payload.progresso
+    projeto.data_entrega = payload.data_entrega
+    projeto.valor = payload.valor
     projeto.save()
+    
+    # Atualiza o ProjetoAtivo
+    from gestao_freelas.services.recorrencia import obter_ou_criar_ativo
+    ativo_info = obter_ou_criar_ativo(projeto)
+    if payload.tipo_recorrencia:
+        ativo_info.tipo_recorrencia = payload.tipo_recorrencia
+    if payload.ativo is not None:
+        ativo_info.ativo = payload.ativo
+    ativo_info.save()
+
     publish(request.auth.id, 'projetos', 'updated', meta={'projeto_id': projeto.id})
     invalidate_user_cache(request.auth.id)
 
     projeto = Projeto.objects.select_related('cliente', 'servico').get(id=projeto.id)
     return 200, projeto_to_dict(projeto)
+
+
+class UpdateStatusSchema(Schema):
+    status: str
+
+
+@router.patch("/{projeto_id}/status", response={200: ProjetoOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar apenas o status do projeto (Kanban)")
+def update_projeto_status(request, projeto_id: int, payload: UpdateStatusSchema):
+    try:
+        projeto = Projeto.objects.get(id=projeto_id, usuario=request.auth)
+    except Projeto.DoesNotExist:
+        return 404, {"detail": "Projeto não encontrado"}
+
+    valid_status = [choice[0] for choice in Projeto.STATUS_CHOICES]
+    if payload.status not in valid_status:
+        return 400, {"detail": f"Status inválido. Escolha um de {valid_status}"}
+
+    projeto.status = payload.status
+    if payload.status == 'COMPLETED':
+        projeto.progresso = 100
+    projeto.save()
+
+    publish(request.auth.id, 'projetos', 'updated', meta={'projeto_id': projeto.id})
+    invalidate_user_cache(request.auth.id)
+    
+    projeto = Projeto.objects.select_related('cliente', 'servico').get(id=projeto.id)
+    return 200, projeto_to_dict(projeto)
+
 
 
 @router.patch(
@@ -124,6 +204,16 @@ def definir_mensalista(request, projeto_id: int, payload: MensalistaInSchema):
         return 404, {"detail": "Projeto não encontrado"}
 
     if payload.ativo:
+        colisao = Projeto.objects.filter(
+            usuario=request.auth,
+            cliente=projeto.cliente,
+            servico=projeto.servico,
+            projeto_ativo__ativo=True,
+            projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']
+        ).exclude(id=projeto_id).exists()
+        if colisao:
+            return 400, {"detail": "Já existe outro contrato com recorrência ativa para este cliente e serviço. Por favor, adicione apenas como tipo Avulso."}
+
         try:
             geracao = ativar_mensalista(
                 projeto,

@@ -158,16 +158,62 @@ export async function demoRequest<T>(
       cliente_nome: cliente.nome,
       servico_id: servico.id,
       servico_nome: servico.nome,
-      mensalista: false,
-      valor_mensal: null,
+      mensalista: body.tipo_recorrencia === 'MENSAL',
+      valor_mensal: body.tipo_recorrencia === 'MENSAL' ? body.valor || null : null,
       dia_vencimento: 5,
       recorrencia_inicio: null,
       criado_em: new Date().toISOString(),
+      status: (body.status || 'DISCOVERY') as any,
+      progresso: Number(body.progresso || 0),
+      data_entrega: body.data_entrega || null,
+      valor: body.valor || null,
+      tipo_recorrencia: (body.tipo_recorrencia || 'AVULSO') as any,
+      ativo: body.ativo !== 'false',
     }
     store.projetos.push(projeto)
     saveDemoStore(store)
     notifyDemoMutation()
     return projeto as T
+  }
+
+  const projetoPatchStatus = path.match(/^\/projetos\/(\d+)\/status$/)
+  if (projetoPatchStatus && method === 'PATCH') {
+    const id = Number(projetoPatchStatus[1])
+    const projeto = store.projetos.find((p) => p.id === id)
+    if (!projeto) throw new ApiError('Projeto não encontrado', 404)
+    projeto.status = (body.status || projeto.status) as any
+    if (projeto.status === 'COMPLETED') {
+      projeto.progresso = 100
+    }
+    saveDemoStore(store)
+    notifyDemoMutation()
+    return projeto as T
+  }
+
+  const projetoPut = path.match(/^\/projetos\/(\d+)$/)
+  if (projetoPut && method === 'PUT') {
+    const id = Number(projetoPut[1])
+    const idx = store.projetos.findIndex((p) => p.id === id)
+    if (idx < 0) throw new ApiError('Projeto não encontrado', 404)
+    const proj = store.projetos[idx]
+    
+    const status = (body.status || proj.status) as any
+    const progresso = body.progresso !== undefined ? Number(body.progresso) : proj.progresso
+    
+    store.projetos[idx] = {
+      ...proj,
+      status,
+      progresso,
+      data_entrega: body.data_entrega || null,
+      valor: body.valor || null,
+      tipo_recorrencia: (body.tipo_recorrencia || proj.tipo_recorrencia) as any,
+      ativo: body.ativo !== 'false',
+      mensalista: body.tipo_recorrencia === 'MENSAL',
+      valor_mensal: body.tipo_recorrencia === 'MENSAL' ? body.valor || null : null,
+    }
+    saveDemoStore(store)
+    notifyDemoMutation()
+    return store.projetos[idx] as T
   }
 
   const mensalistaPatch = path.match(/^\/projetos\/(\d+)\/mensalista$/)

@@ -3,8 +3,9 @@ Server-Sent Events para sincronização do front-end.
 """
 import queue
 
-from django.http import StreamingHttpResponse
-from ninja import Router
+from django.http import StreamingHttpResponse, HttpResponse
+from ninja import Router, Query
+from typing import Optional
 
 from api.realtime import format_sse, subscribe, unsubscribe
 from ninja_jwt.authentication import JWTAuth
@@ -22,19 +23,19 @@ def _resolve_user(request, token: str | None):
 
 
 @router.get('/stream', auth=None, summary='Stream SSE de atualizações')
-def event_stream(request, token: str):
+def event_stream(request, token: str = Query(..., description="Access JWT token (?token=<token>)")):
     """
     Conexão SSE autenticada. Passe `?token=<access_jwt>` — EventSource não envia Bearer.
+    
+    - **token**: Access JWT token obtido no login (obrigatório)
+    
+    **Requer autenticação:** JWT token válido via query parameter.
     """
     if not token:
-        from django.http import HttpResponse
-
         return HttpResponse('Token obrigatório (?token=)', status=401)
 
     user = _resolve_user(request, token)
     if user is None:
-        from django.http import HttpResponse
-
         return HttpResponse('Unauthorized', status=401)
 
     user_id = user.id

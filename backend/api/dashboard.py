@@ -5,7 +5,7 @@ from ninja import Router, Schema, Query
 from typing import Optional, List
 from datetime import date
 from decimal import Decimal
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from gestao_freelas.models import Pagamento, Projeto, Cliente
 from api.schemas import ErrorSchema
 from api.cache import get_cached_response, set_cached_response
@@ -35,6 +35,15 @@ class DashboardMensalSchema(Schema):
     clientes_ativos: int = Field(..., description="Quantidade de clientes com pagamentos")
     previsto_proximo_mes: str = Field(..., description="Valor previsto para o próximo mês")
     por_cliente: list = Field(..., description="Detalhamento por cliente")
+
+
+class PrevisaoItemSchema(Schema):
+    projeto_id: int = Field(..., description="ID do projeto")
+    cliente_nome: str = Field(..., description="Nome do cliente")
+    servico_nome: str = Field(..., description="Nome do serviço")
+    tipo_recorrencia: str = Field(..., description="Tipo de recorrência")
+    valor_previsto: str = Field(..., description="Valor previsto para o próximo mês")
+    dia_vencimento: int = Field(..., description="Dia previsto de vencimento")
 
 
 class DashboardMensalQuerySchema(Schema):
@@ -145,24 +154,48 @@ def dashboard_mensal(
     total_recebido = agregados['total'] or Decimal('0.00')
     total_pagamentos = agregados['quantidade'] or 0
 
-    # Previsto = soma dos contratos mensalistas ativos (não histórico de parcelas)
-    projetos_mensalistas = Projeto.objects.filter(
-        usuario=request.auth,
-        mensalista=True,
-        valor_mensal__isnull=False,
-    )
+    # Previsto = soma dos contratos recorrentes ativos usando ProjetoAtivo (MENSAL ou QUINZENAL)
+    # OU qualquer projeto do usuário que teve um pagamento recorrente no mês atual (fallbacks inteligentes)
+    hoje = date.today()
+    start_curr, end_curr = _month_range(hoje.year, hoje.month)
+    projetos_com_pagamentos_recorrentes = Pagamento.objects.filter(
+        projeto__usuario=request.auth,
+        tipo_pagamento__in=['MENSAL', 'QUINZENAL'],
+        data__gte=start_curr,
+        data__lt=end_curr
+    ).values_list('projeto_id', flat=True)
+
+    projetos_recorrentes = Projeto.objects.filter(
+        usuario=request.auth
+    ).filter(
+        Q(projeto_ativo__ativo=True, projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']) |
+        Q(id__in=projetos_com_pagamentos_recorrentes)
+    ).distinct().select_related('projeto_ativo')
+
     if filtros.cliente_id:
-        projetos_mensalistas = projetos_mensalistas.filter(cliente_id=filtros.cliente_id)
+        projetos_recorrentes = projetos_recorrentes.filter(cliente_id=filtros.cliente_id)
 
-    previsto_proximo_mes_decimal = sum(
-        (p.valor_mensal for p in projetos_mensalistas),
-        Decimal('0.00'),
-    )
+    if tipo_pagamento:
+        if tipo_pagamento in ['MENSAL', 'QUINZENAL']:
+            projetos_recorrentes = projetos_recorrentes.filter(
+                Q(projeto_ativo__tipo_recorrencia=tipo_pagamento) |
+                Q(id__in=Pagamento.objects.filter(projeto__usuario=request.auth, tipo_pagamento=tipo_pagamento, data__gte=start_curr, data__lt=end_curr).values_list('projeto_id', flat=True))
+            )
+        else:
+            projetos_recorrentes = projetos_recorrentes.none()
 
-    if tipo_pagamento == 'AVULSO':
-        previsto_proximo_mes_decimal = Decimal('0.00')
-    elif tipo_pagamento == 'QUINZENAL':
-        previsto_proximo_mes_decimal = previsto_proximo_mes_decimal * 2
+    previsto_proximo_mes_decimal = Decimal('0.00')
+    for p in projetos_recorrentes:
+        val = p.valor
+        if val is None:
+            val = p.valor_mensal
+        if val is None:
+            # Fallback para o último pagamento mensal/quinzenal recebido
+            ultimo_pag = p.pagamentos.filter(tipo_pagamento__in=['MENSAL', 'QUINZENAL']).order_by('-data').first()
+            if ultimo_pag:
+                val = ultimo_pag.valor
+        if val is not None:
+            previsto_proximo_mes_decimal += val
     
     # Agrupa por cliente
     clientes_map = {}
@@ -280,3 +313,49 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
     ]
     set_cached_response(request.auth.id, payload, "dashboard", "extrato", query=query_key)
     return payload
+
+
+@router.get("/previsao", response={200: List[PrevisaoItemSchema]}, summary="Previsão de recorrentes do próximo mês")
+def dashboard_previsao(request):
+    """
+    Retorna a lista de receitas previstas para o próximo mês, identificando apenas os contratos recorrentes ativos.
+    """
+    hoje = date.today()
+    start_curr, end_curr = _month_range(hoje.year, hoje.month)
+    projetos_com_pagamentos_recorrentes = Pagamento.objects.filter(
+        projeto__usuario=request.auth,
+        tipo_pagamento__in=['MENSAL', 'QUINZENAL'],
+        data__gte=start_curr,
+        data__lt=end_curr
+    ).values_list('projeto_id', flat=True)
+
+    projetos_recorrentes = Projeto.objects.filter(
+        usuario=request.auth
+    ).filter(
+        Q(projeto_ativo__ativo=True, projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']) |
+        Q(id__in=projetos_com_pagamentos_recorrentes)
+    ).distinct().select_related('cliente', 'servico', 'projeto_ativo')
+
+    payload = []
+    for p in projetos_recorrentes:
+        valor = p.valor
+        if valor is None:
+            valor = p.valor_mensal
+        if valor is None:
+            ultimo_pag = p.pagamentos.filter(tipo_pagamento__in=['MENSAL', 'QUINZENAL']).order_by('-data').first()
+            if ultimo_pag:
+                valor = ultimo_pag.valor
+        
+        tipo_rec = p.projeto_ativo.tipo_recorrencia if hasattr(p, 'projeto_ativo') else 'MENSAL'
+        if tipo_rec == 'AVULSO':
+            tipo_rec = 'MENSAL'
+
+        payload.append({
+            "projeto_id": p.id,
+            "cliente_nome": p.cliente.nome,
+            "servico_nome": p.servico.nome,
+            "tipo_recorrencia": tipo_rec,
+            "valor_previsto": str(valor or Decimal('0.00')),
+            "dia_vencimento": p.dia_vencimento or 5
+        })
+    return 200, payload

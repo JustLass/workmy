@@ -10,10 +10,18 @@ from typing import TypedDict
 
 from django.db import transaction
 
-from gestao_freelas.models import Pagamento, Projeto
+from gestao_freelas.models import Pagamento, Projeto, ProjetoAtivo
 
-# Meses futuros gerados a partir do mês corrente (inclui o mês atual se ainda não existir parcela)
-HORIZONTE_MESES = 24
+
+def obter_ou_criar_ativo(projeto: Projeto) -> ProjetoAtivo:
+    ativo_info, created = ProjetoAtivo.objects.get_or_create(
+        projeto=projeto,
+        defaults={
+            'ativo': projeto.mensalista,
+            'tipo_recorrencia': 'MENSAL' if projeto.mensalista else 'AVULSO'
+        }
+    )
+    return ativo_info
 
 
 class ResultadoGeracao(TypedDict):
@@ -52,7 +60,7 @@ def _iter_meses(inicio: date, fim: date):
 
 def _inferir_valor_e_dia(projeto: Projeto) -> tuple[Decimal, int]:
     ultimo = (
-        Pagamento.objects.filter(projeto=projeto, tipo_pagamento='MENSAL')
+        Pagamento.objects.filter(projeto=projeto, tipo_pagamento__in=['MENSAL', 'QUINZENAL'])
         .order_by('-data')
         .first()
     )
@@ -61,7 +69,7 @@ def _inferir_valor_e_dia(projeto: Projeto) -> tuple[Decimal, int]:
         valor = ultimo.valor
     if valor is None:
         raise ValueError(
-            'Informe valor_mensal ou registre ao menos um pagamento MENSAL antes de ativar a recorrência.'
+            'Informe valor_mensal ou registre ao menos um pagamento antes de ativar a recorrência.'
         )
     dia = projeto.dia_vencimento or (ultimo.data.day if ultimo else 5)
     return valor, _clamp_dia(dia)
@@ -70,10 +78,12 @@ def _inferir_valor_e_dia(projeto: Projeto) -> tuple[Decimal, int]:
 @transaction.atomic
 def gerar_parcelas_mensais(projeto: Projeto, *, persistir_config: bool = False) -> ResultadoGeracao:
     """
-    Cria parcelas MENSAL futuras de forma idempotente (uma por projeto + YYYY-MM).
-    Só executa se projeto.mensalista for True.
+    Cria parcelas automáticas futuras de forma idempotente (mensal ou quinzenal).
+    Só executa se o ProjetoAtivo estiver ativo.
     """
-    if not projeto.mensalista:
+    ativo_info = obter_ou_criar_ativo(projeto)
+
+    if not ativo_info.ativo or ativo_info.tipo_recorrencia == 'AVULSO':
         return {'criados': 0, 'existentes': 0, 'referencias': []}
 
     valor, dia = _inferir_valor_e_dia(projeto)
@@ -89,7 +99,8 @@ def gerar_parcelas_mensais(projeto: Projeto, *, persistir_config: bool = False) 
         projeto.dia_vencimento = dia
         if not projeto.recorrencia_inicio:
             projeto.recorrencia_inicio = inicio
-        projeto.save(update_fields=['valor_mensal', 'dia_vencimento', 'recorrencia_inicio'])
+        projeto.mensalista = True
+        projeto.save(update_fields=['valor_mensal', 'dia_vencimento', 'recorrencia_inicio', 'mensalista'])
 
     criados = 0
     existentes = 0
@@ -98,23 +109,59 @@ def gerar_parcelas_mensais(projeto: Projeto, *, persistir_config: bool = False) 
     for ano, mes in _iter_meses(inicio, fim):
         ref = _referencia(ano, mes)
         referencias.append(ref)
-        data_parcela = _data_vencimento(ano, mes, dia)
 
-        pagamento, created = Pagamento.objects.get_or_create(
-            projeto=projeto,
-            referencia_mes=ref,
-            defaults={
-                'valor': valor,
-                'tipo_pagamento': 'MENSAL',
-                'data': data_parcela,
-                'observacao': 'Gerado automaticamente',
-                'gerado_automaticamente': True,
-            },
-        )
-        if created:
-            criados += 1
-        else:
-            existentes += 1
+        if ativo_info.tipo_recorrencia == 'MENSAL':
+            data_parcela = _data_vencimento(ano, mes, dia)
+            pagamento, created = Pagamento.objects.get_or_create(
+                projeto=projeto,
+                referencia_mes=ref,
+                defaults={
+                    'valor': valor,
+                    'tipo_pagamento': 'MENSAL',
+                    'data': data_parcela,
+                    'observacao': 'Gerado automaticamente (Mensal)',
+                    'gerado_automaticamente': True,
+                },
+            )
+            if created:
+                criados += 1
+            else:
+                existentes += 1
+        elif ativo_info.tipo_recorrencia == 'QUINZENAL':
+            # Quinzenal gera duas parcelas no mês: dia V e dia V+15 (clamped)
+            data_q1 = _data_vencimento(ano, mes, dia)
+            dia_q2 = dia + 15
+            if dia_q2 > 28:
+                dia_q2 = 28
+            data_q2 = _data_vencimento(ano, mes, dia_q2)
+
+            # Primeira Quinzena
+            if not Pagamento.objects.filter(projeto=projeto, data=data_q1, tipo_pagamento='QUINZENAL').exists():
+                Pagamento.objects.create(
+                    projeto=projeto,
+                    valor=valor / 2,
+                    tipo_pagamento='QUINZENAL',
+                    data=data_q1,
+                    observacao='Gerado automaticamente (1ª Quinzena)',
+                    gerado_automaticamente=True,
+                )
+                criados += 1
+            else:
+                existentes += 1
+
+            # Segunda Quinzena
+            if not Pagamento.objects.filter(projeto=projeto, data=data_q2, tipo_pagamento='QUINZENAL').exists():
+                Pagamento.objects.create(
+                    projeto=projeto,
+                    valor=valor / 2,
+                    tipo_pagamento='QUINZENAL',
+                    data=data_q2,
+                    observacao='Gerado automaticamente (2ª Quinzena)',
+                    gerado_automaticamente=True,
+                )
+                criados += 1
+            else:
+                existentes += 1
 
     return {'criados': criados, 'existentes': existentes, 'referencias': referencias}
 
@@ -126,6 +173,7 @@ def ativar_mensalista(
     valor_mensal: Decimal | None = None,
     dia_vencimento: int | None = None,
     recorrencia_inicio: date | None = None,
+    tipo_recorrencia: str = 'MENSAL',
 ) -> ResultadoGeracao:
     if valor_mensal is not None:
         projeto.valor_mensal = valor_mensal
@@ -139,6 +187,12 @@ def ativar_mensalista(
     projeto.mensalista = True
     projeto.save()
 
+    # Atualiza ou cria a configuração de ProjetoAtivo
+    ativo_info = obter_ou_criar_ativo(projeto)
+    ativo_info.ativo = True
+    ativo_info.tipo_recorrencia = tipo_recorrencia
+    ativo_info.save()
+
     return gerar_parcelas_mensais(projeto, persistir_config=True)
 
 
@@ -148,14 +202,20 @@ def desativar_mensalista(projeto: Projeto) -> None:
     projeto.mensalista = False
     projeto.save(update_fields=['mensalista'])
 
+    ativo_info = obter_ou_criar_ativo(projeto)
+    ativo_info.ativo = False
+    ativo_info.save()
+
 
 def gerar_recorrencias_usuario(usuario_id: int) -> dict[str, int]:
     """Job diário: estende o horizonte para todos os contratos mensalistas do usuário."""
     totais = {'projetos': 0, 'criados': 0, 'existentes': 0}
-    projetos = Projeto.objects.filter(usuario_id=usuario_id, mensalista=True)
+    # Seleciona projetos que têm ProjetoAtivo ativo
+    projetos = Projeto.objects.filter(usuario_id=usuario_id, projeto_ativo__ativo=True)
     for projeto in projetos:
         resultado = gerar_parcelas_mensais(projeto)
         totais['projetos'] += 1
         totais['criados'] += resultado['criados']
         totais['existentes'] += resultado['existentes']
     return totais
+

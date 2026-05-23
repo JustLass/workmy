@@ -10,6 +10,7 @@ import { ClienteDetailPage } from './pages/ClienteDetailPage.tsx'
 import { ServicoDetailPage } from './pages/ServicoDetailPage.tsx'
 import { PagamentosPage } from './pages/PagamentosPage.tsx'
 import { ContratosPage } from './pages/ContratosPage.tsx'
+import { ProjetosPage } from './pages/ProjetosPage.tsx'
 
 function App() {
   return (
@@ -27,7 +28,9 @@ function App() {
       >
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="projetos" element={<ProjetosPage />} />
         <Route path="clientes" element={<ClientesPage />} />
+
         <Route path="clientes/:id" element={<ClienteDetailPage />} />
         <Route path="servicos" element={<ServicosPage />} />
         <Route path="servicos/:id" element={<ServicoDetailPage />} />
@@ -39,5 +42,6 @@ function App() {
     </Routes>
   )
 }
+
 
 export default App

@@ -51,7 +51,7 @@ export function LoginPage() {
       <form className="card auth-card" onSubmit={onSubmit}>
         <header className="auth-headline">
           <span className="auth-kicker">
-            {IS_DEMO_MODE ? 'WorkMy — Demonstração' : 'WorkMy Secure Access'}
+            {IS_DEMO_MODE ? 'WorkMy — Demonstração' : 'Acesso Seguro ao WorkMy'}
           </span>
           <h1>Entrar</h1>
           <p className="muted">

@@ -11,6 +11,7 @@ from api.pagamentos import router as pagamentos_router
 from api.dashboard import router as dashboard_router
 from api.health import router as health_router
 from api.events import router as events_router
+from api.stitch import router as stitch_router
 
 # Cria a API principal
 api = NinjaAPI(
@@ -31,8 +32,12 @@ api.add_router("/pagamentos/", router=pagamentos_router)
 # Adiciona router de dashboard
 api.add_router("/dashboard/", router=dashboard_router)
 
+# Adiciona router do Stitch MCP
+api.add_router("/stitch/", router=stitch_router)
+
 # Endpoints públicos de health check
 api.add_router("/health/", router=health_router)
+
 
 # SSE — atualizações em tempo real (autenticado)
 api.add_router("/events/", router=events_router)

@@ -5,6 +5,7 @@ import {
   IconLink,
   IconUsers,
   IconWallet,
+  IconBoard,
 } from '../shared/ui/NavIcons'
 
 export type NavItem = {
@@ -16,8 +17,11 @@ export type NavItem = {
 
 export const mainNavItems: NavItem[] = [
   { to: '/dashboard', label: 'Início', shortLabel: 'Início', Icon: IconHome },
+  { to: '/projetos', label: 'Projetos', shortLabel: 'Projetos', Icon: IconBoard },
   { to: '/clientes', label: 'Clientes', shortLabel: 'Clientes', Icon: IconUsers },
   { to: '/servicos', label: 'Serviços', shortLabel: 'Serviços', Icon: IconBriefcase },
   { to: '/contratos', label: 'Contratos', shortLabel: 'Contratos', Icon: IconLink },
   { to: '/pagamentos', label: 'Financeiro', shortLabel: 'Financeiro', Icon: IconWallet },
 ]
+
+

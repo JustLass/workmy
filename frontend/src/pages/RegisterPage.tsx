@@ -37,7 +37,7 @@ export function RegisterPage() {
     <div className="auth-page">
       <form className="card auth-card" onSubmit={onSubmit}>
         <header className="auth-headline">
-          <span className="auth-kicker">WorkMy Onboarding</span>
+          <span className="auth-kicker">Cadastro no WorkMy</span>
           <h1>Criar conta</h1>
           <p className="muted">Comece com uma base segura para gerenciar clientes e fluxo de caixa.</p>
         </header>

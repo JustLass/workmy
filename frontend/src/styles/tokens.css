@@ -1,47 +1,60 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap');
 
 :root {
   /* Typography */
-  --font-sans: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-heading: 'Outfit', sans-serif;
 
-  /* Brand */
-  --brand-50: #f0faf6;
-  --brand-100: #d9f2e8;
-  --brand-500: #14834d;
-  --brand-600: #0f6b4e;
-  --brand-700: #0a5239;
+  /* Brand / Moss Forest Green Accent */
+  --brand-50: #f4f7f5;
+  --brand-100: #e2ede6;
+  --brand-200: #c5dbce;
+  --brand-500: #2d5a3f; /* Moss / Forest Green */
+  --brand-600: #234731;
+  --brand-700: #193323;
 
-  /* Surfaces */
-  --bg-main: #f6f8f7;
-  --bg-card: #ffffff;
-  --bg-soft: #f0f4f2;
+  /* Surfaces - Warm Sand Beige & Organic Cream */
+  --bg-main: #fbfaf6; /* Cream Sand Beige */
+  --bg-card: rgba(255, 255, 255, 0.72); /* Translucent glass */
+  --bg-soft: rgba(45, 90, 63, 0.05); /* Soft beige-green tint */
   --bg-elevated: #ffffff;
+  --bg-sidebar: rgba(247, 245, 237, 0.85); /* Sand beige glass sidebar */
 
-  /* Text */
-  --text-main: #0f172a;
-  --text-muted: #64748b;
+  /* Text - High Contrast Forest-Charcoal */
+  --text-main: #1c261e; /* Deep Forest Black */
+  --text-muted: #5e6b60; /* Calm Moss Slate */
   --text-inverse: #ffffff;
 
-  /* Borders */
-  --line: #e2e8f0;
-  --line-brand: rgba(15, 107, 78, 0.2);
+  /* Borders - 1px Organic Hairlines */
+  --line: rgba(45, 90, 63, 0.08);
+  --line-brand: rgba(45, 90, 63, 0.22);
+  --line-success: rgba(16, 185, 129, 0.22);
 
-  /* Semantic */
-  --accent: var(--brand-600);
-  --accent-hover: var(--brand-700);
-  --danger: #dc2626;
-  --danger-bg: #fef2f2;
-  --success: #16a34a;
-  --warning: #d97706;
+  /* Semantic Tones */
+  --accent: var(--brand-500);
+  --accent-hover: var(--brand-600);
+  --accent-purple: #7c3aed;
+  --danger: #d32f2f;
+  --danger-bg: rgba(211, 47, 47, 0.06);
+  --success: #1b8a4f;
+  --success-bg: rgba(27, 138, 79, 0.08);
+  --warning: #cc7a00;
+  --warning-bg: rgba(204, 122, 0, 0.06);
+
+  /* Glassmorphism blur */
+  --blur-md: 16px;
+  --blur-lg: 24px;
 
   /* Radius & shadow */
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-full: 999px;
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
-  --shadow-brand: 0 8px 24px rgba(15, 107, 78, 0.12);
+  
+  --shadow-sm: 0 1px 2px rgba(45, 90, 63, 0.02);
+  --shadow-md: 0 10px 30px -10px rgba(45, 90, 63, 0.06), 0 1px 3px rgba(45, 90, 63, 0.02);
+  --shadow-brand: 0 8px 24px -6px rgba(45, 90, 63, 0.25);
+  --shadow-success: 0 8px 24px -6px rgba(27, 138, 79, 0.2);
 
   /* Layout */
   --sidebar-width: 260px;
