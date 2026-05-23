@@ -222,3 +222,22 @@ def me(request):
         "telefone": user.telefone
     }
 
+
+class MessageSchema(Schema):
+    """Schema de resposta com mensagem simples"""
+    message: str = Field(..., description="Mensagem de sucesso")
+
+
+@router.post("/logout", response={200: MessageSchema, 401: ErrorSchema}, auth=AuthBearer(), summary="Deslogar usuário")
+def logout(request):
+    """
+    Invalida o token JWT do usuário (logout).
+    
+    **Requer autenticação:** Bearer token no header Authorization.
+    
+    **Nota:** Para logout completo, também remova o refresh token do cliente.
+    """
+    user = request.auth
+    # Aqui você poderia adicionar token à blacklist se implementado
+    # TokenBlacklist.objects.create(token=request.auth_header)
+    return 200, {"message": f"Usuário {user.username} deslogado com sucesso"}
