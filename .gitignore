@@ -93,5 +93,11 @@ Thumbs.db
 
 # Hide local Copilot prompt packs
 .github/prompts/ui-ux-pro-max/
-
 .github/prompts/ui-ux-pro-max
+
+# 🗑️ Arquivos Stitch desnecessários (não versionados)
+stitch-skills/
+stitch_workmy_intelligent_freelance_dashboard/
+stitch_info.txt
+stitch_screen_html.txt
+
