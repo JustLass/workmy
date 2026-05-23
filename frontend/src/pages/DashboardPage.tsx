@@ -24,16 +24,16 @@ export function DashboardPage() {
     return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
   }
 
-  // Derived values for exact mock dashboard mapping
-  const totalRevenue = dataFinanceiro ? Number(dataFinanceiro.total_recebido) : 24480.00
-  const activeCount = projetos.length || 14
-  const pendingRevenue = dataFinanceiro ? Number(dataFinanceiro.previsto_proximo_mes) : 4120.00
+  // Derived values - sempre usar dados reais da API
+  const totalRevenue = dataFinanceiro ? Number(dataFinanceiro.total_recebido) : 0
+  const activeCount = projetos.length
+  const pendingRevenue = dataFinanceiro ? Number(dataFinanceiro.previsto_proximo_mes) : 0
 
   // Calculate project completion percent
   const completedCount = projetos.filter(p => p.status === 'COMPLETED').length
   const completionPercent = projetos.length
     ? Math.round((completedCount / projetos.length) * 100)
-    : 70
+    : 0
 
   // Dynamically calculate actual payments over the last 6 months
   const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
