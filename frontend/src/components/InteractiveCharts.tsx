@@ -67,9 +67,11 @@ export function InteractiveLineChart({ data, height = 200, strokeColor = '#17312
     if (!svgRef.current) return
     const rect = svgRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
-
-    const scaleX = svgWidth / rect.width
-    const svgMouseX = mouseX * scaleX
+    
+    // Normalizar a posição do mouse para o intervalo [0, 1]
+    const normalizedX = mouseX / rect.width
+    // Mapear para as coordenadas do SVG
+    const svgMouseX = normalizedX * svgWidth
 
     let minDistance = Infinity
     let nearestIdx = 0
@@ -270,8 +272,10 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
     const rect = svgRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
 
-    const scaleX = svgWidth / rect.width
-    const svgMouseX = mouseX * scaleX
+    // Normalizar a posição do mouse para o intervalo [0, 1]
+    const normalizedX = mouseX / rect.width
+    // Mapear para as coordenadas do SVG
+    const svgMouseX = normalizedX * svgWidth
 
     const groupWidth = chartWidth / data.length
     let nearestIdx = Math.floor((svgMouseX - paddingLeft) / groupWidth)
