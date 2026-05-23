@@ -21,20 +21,21 @@ from django.urls import path
 from django.conf import settings
 from django.conf.urls.static import static
 
-# Importa a API do Ninja
-from api.api import api
+# Importa a API versão 1 (v0 mantida para compatibilidade)
+from api.api_v1 import api_v1
+from api.api import api as api_v0  # Legacy: será descontinuada
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # API REST
-    path('api/', api.urls),
+    # API REST - Versão 1 (ATUAL)
+    path('api/v1/', api_v1.urls),
+    
+    # API REST - Versão 0 (LEGACY - deprecated em v2.0)
+    path('api/', api_v0.urls),
     
 ]
 
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-
-
