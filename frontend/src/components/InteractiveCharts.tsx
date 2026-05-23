@@ -339,10 +339,8 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
           const barGap = 6
 
           const incomeHeight = (item.income / maxVal) * chartHeight
-          const expenseHeight = (item.expense / maxVal) * chartHeight
 
-          const incomeX = groupX + (groupWidth - barWidth * 2 - barGap) / 2
-          const expenseX = incomeX + barWidth + barGap
+          const incomeX = groupX + (groupWidth - barWidth) / 2
 
           const isHovered = hoverIndex === idx
 
@@ -369,17 +367,6 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
                 height={incomeHeight}
                 fill="#173124"
                 className={`transition-all duration-200 ${isHovered ? 'brightness-110' : 'opacity-90'}`}
-                rx="4"
-              />
-
-              {/* Expense bar (Sage Accent) */}
-              <rect
-                x={expenseX}
-                y={svgHeight - paddingBottom - expenseHeight}
-                width={barWidth}
-                height={expenseHeight}
-                fill="#83a38b"
-                className={`transition-all duration-200 ${isHovered ? 'brightness-110' : 'opacity-60'}`}
                 rx="4"
               />
 
@@ -418,15 +405,6 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
             </span>
             <span className="font-mono">
               {data[hoverIndex].income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-            </span>
-          </div>
-          <div className="flex justify-between items-center text-xs">
-            <span className="flex items-center gap-1.5 font-normal">
-              <span className="w-2.5 h-2.5 rounded-full bg-secondary-fixed-dim" style={{ backgroundColor: '#83a38b' }}></span>
-              Despesas:
-            </span>
-            <span className="font-mono">
-              {data[hoverIndex].expense.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
             </span>
           </div>
         </div>

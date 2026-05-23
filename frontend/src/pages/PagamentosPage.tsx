@@ -4,7 +4,7 @@ import { useApi } from '../hooks/useApi'
 import type { Pagamento, Projeto } from '../types'
 import { ApiError } from '../lib/http'
 import { formatCurrency, formatDate } from '../lib/format'
-import { InteractiveBarChart } from '../components/InteractiveCharts'
+import { InteractiveLineChart } from '../components/InteractiveCharts'
 
 export function PagamentosPage() {
   const { request } = useApi()
@@ -127,10 +127,10 @@ export function PagamentosPage() {
   const totalAvulso = items.filter(i => i.tipo_pagamento === 'AVULSO').reduce((acc, curr) => acc + Number(curr.valor), 0)
   const totalMensal = items.filter(i => i.tipo_pagamento === 'MENSAL').reduce((acc, curr) => acc + Number(curr.valor), 0)
 
-  // Dynamically calculate interactive bar chart data based on BRL database sums
+  // Dynamically calculate interactive line chart data based on BRL database sums
   const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
   
-  const getRecentBarChartData = () => {
+  const getRecentChartData = () => {
     const result = []
     const today = new Date()
     
@@ -150,14 +150,13 @@ export function PagamentosPage() {
         
       result.push({
         label,
-        income: incomeSum,
-        expense: incomeSum * 0.3, // Simulated business expense (30% of actual revenue)
+        value: incomeSum,
       })
     }
     return result
   }
 
-  const barChartData = getRecentBarChartData()
+  const chartData = getRecentChartData()
 
   // Calculate real faturamento growth percent (Current Month vs Previous Month)
   const getGrowthPercentage = () => {
@@ -243,15 +242,15 @@ export function PagamentosPage() {
         <div className="organic-card p-lg rounded-xl lg:col-span-2 min-h-[400px] flex flex-col shadow-sm bg-white">
           <div className="flex justify-between items-center mb-xl">
             <div>
-              <h3 className="font-headline-md text-headline-md text-on-surface font-bold text-lg">Fluxo de Caixa</h3>
-              <p className="text-on-surface-variant font-label-sm text-sm">Visão geral de receitas reais recebidas vs despesas estimadas</p>
+              <h3 className="font-headline-md text-headline-md text-on-surface font-bold text-lg">Fluxo de Receitas</h3>
+              <p className="text-on-surface-variant font-label-sm text-sm">Visão geral de receitas reais recebidas nos últimos 6 meses</p>
             </div>
             <div className="flex bg-surface-container-low p-xs rounded-lg border border-outline-variant">
               <button className="px-md py-xs text-primary bg-primary-fixed rounded-md font-label-sm font-bold text-xs">Últimos 6 Meses</button>
             </div>
           </div>
           <div className="relative w-full">
-            <InteractiveBarChart data={barChartData} height={250} />
+            <InteractiveLineChart data={chartData} height={250} />
           </div>
         </div>
 
