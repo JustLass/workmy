@@ -13,7 +13,6 @@ interface LineChartProps {
 
 export function InteractiveLineChart({ data, height = 200, strokeColor = '#173124' }: LineChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const svgRef = useRef<SVGSVGElement | null>(null)
 
   if (data.length === 0) {
@@ -68,10 +67,26 @@ export function InteractiveLineChart({ data, height = 200, strokeColor = '#17312
     const rect = svgRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
     
-    // Normalizar a posição do mouse para o intervalo [0, 1]
-    const normalizedX = mouseX / rect.width
-    // Mapear para as coordenadas do SVG
-    const svgMouseX = normalizedX * svgWidth
+    // Calcula os fatores de escala e offsets devido à preservação da proporção (aspect ratio) do SVG
+    const svgAspect = svgWidth / svgHeight
+    const rectAspect = rect.width / rect.height
+    
+    let scale = 1
+    let offsetX = 0
+    
+    if (rectAspect > svgAspect) {
+      // Pilarbox: espaços em branco nas laterais esquerda e direita
+      scale = rect.height / svgHeight
+      const drawnWidth = svgWidth * scale
+      offsetX = (rect.width - drawnWidth) / 2
+    } else {
+      // Letterbox: espaços em branco no topo e na base
+      scale = rect.width / svgWidth
+    }
+
+    // Traduz a coordenada física do mouse para a coordenada lógica do viewBox do SVG
+    const localMouseX = mouseX - offsetX
+    const svgMouseX = localMouseX / scale
 
     let minDistance = Infinity
     let nearestIdx = 0
@@ -85,15 +100,6 @@ export function InteractiveLineChart({ data, height = 200, strokeColor = '#17312
     })
 
     setHoverIndex(nearestIdx)
-
-    const targetPt = points[nearestIdx]
-    const clientX = rect.left + (targetPt.x / svgWidth) * rect.width
-    const clientY = rect.top + (targetPt.y / svgHeight) * rect.height
-
-    setTooltipPos({
-      x: clientX - rect.left,
-      y: clientY - rect.top - 50
-    })
   }
 
   const handleMouseLeave = () => {
@@ -101,7 +107,7 @@ export function InteractiveLineChart({ data, height = 200, strokeColor = '#17312
   }
 
   return (
-    <div className="relative w-full overflow-visible group" style={{ height: `${svgHeight}px` }}>
+    <div className="relative w-full max-w-[800px] mx-auto overflow-visible group" style={{ height: `${svgHeight}px` }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -114,6 +120,9 @@ export function InteractiveLineChart({ data, height = 200, strokeColor = '#17312
             <stop offset="0%" stopColor="#173124" stopOpacity="0.15"></stop>
             <stop offset="100%" stopColor="#173124" stopOpacity="0"></stop>
           </linearGradient>
+          <filter id="tooltipShadow" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.15" />
+          </filter>
         </defs>
 
         {/* Horizontal grid lines */}
@@ -208,25 +217,46 @@ export function InteractiveLineChart({ data, height = 200, strokeColor = '#17312
             />
           </g>
         )}
-      </svg>
 
-      {/* Tooltip */}
-      {hoverIndex !== null && (
-        <div
-          className="absolute z-30 pointer-events-none bg-primary text-on-primary text-xs font-semibold py-sm px-md rounded-xl shadow-lg border border-primary-container flex flex-col gap-0.5"
-          style={{
-            left: `${tooltipPos.x}px`,
-            top: `${tooltipPos.y}px`,
-            transform: 'translate(-50%, -100%)',
-            transition: 'left 0.05s ease, top 0.05s ease',
-          }}
-        >
-          <span className="opacity-80 text-[10px] uppercase tracking-wider">{points[hoverIndex].label}</span>
-          <span className="font-mono text-sm">
-            {points[hoverIndex].value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-          </span>
-        </div>
-      )}
+        {/* Native SVG Tooltip */}
+        {hoverIndex !== null && (() => {
+          const pt = points[hoverIndex]
+          const tooltipWidth = 140
+          const tooltipHeight = 50
+          const tx = Math.max(10, Math.min(svgWidth - tooltipWidth - 10, pt.x - tooltipWidth / 2))
+          const ty = Math.max(10, pt.y - tooltipHeight - 15)
+          const valueFormatted = pt.value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 2 })
+          return (
+            <g className="pointer-events-none">
+              <rect
+                x={tx}
+                y={ty}
+                width={tooltipWidth}
+                height={tooltipHeight}
+                rx="8"
+                fill="#173124"
+                filter="url(#tooltipShadow)"
+              />
+              <text
+                x={tx + tooltipWidth / 2}
+                y={ty + 18}
+                textAnchor="middle"
+                className="text-[9px] font-bold fill-white/80 tracking-wider uppercase font-sans"
+              >
+                {pt.label}
+              </text>
+              <text
+                x={tx + tooltipWidth / 2}
+                y={ty + 36}
+                textAnchor="middle"
+                className="text-[12px] font-bold fill-white font-mono"
+              >
+                {valueFormatted}
+              </text>
+            </g>
+          )
+        })()}
+      </svg>
     </div>
   )
 }
@@ -244,7 +274,6 @@ interface BarChartProps {
 
 export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null)
-  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 })
   const svgRef = useRef<SVGSVGElement | null>(null)
 
   if (data.length === 0) {
@@ -272,10 +301,23 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
     const rect = svgRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
 
-    // Normalizar a posição do mouse para o intervalo [0, 1]
-    const normalizedX = mouseX / rect.width
-    // Mapear para as coordenadas do SVG
-    const svgMouseX = normalizedX * svgWidth
+    // Calcula os fatores de escala e offsets devido à proporção do SVG
+    const svgAspect = svgWidth / svgHeight
+    const rectAspect = rect.width / rect.height
+    
+    let scale = 1
+    let offsetX = 0
+    
+    if (rectAspect > svgAspect) {
+      scale = rect.height / svgHeight
+      const drawnWidth = svgWidth * scale
+      offsetX = (rect.width - drawnWidth) / 2
+    } else {
+      scale = rect.width / svgWidth
+    }
+
+    const localMouseX = mouseX - offsetX
+    const svgMouseX = localMouseX / scale
 
     const groupWidth = chartWidth / data.length
     let nearestIdx = Math.floor((svgMouseX - paddingLeft) / groupWidth)
@@ -283,15 +325,6 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
     if (nearestIdx >= data.length) nearestIdx = data.length - 1
 
     setHoverIndex(nearestIdx)
-
-    const groupX = paddingLeft + nearestIdx * groupWidth + groupWidth / 2
-    const clientX = rect.left + (groupX / svgWidth) * rect.width
-    const clientY = rect.top + (paddingTop / svgHeight) * rect.height
-
-    setTooltipPos({
-      x: clientX - rect.left,
-      y: clientY - rect.top - 10
-    })
   }
 
   const handleMouseLeave = () => {
@@ -299,7 +332,7 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
   }
 
   return (
-    <div className="relative w-full overflow-visible group" style={{ height: `${svgHeight}px` }}>
+    <div className="relative w-full max-w-[800px] mx-auto overflow-visible group" style={{ height: `${svgHeight}px` }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}
@@ -307,6 +340,12 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
       >
+        <defs>
+          <filter id="tooltipShadowBar" x="-20%" y="-20%" width="140%" height="140%">
+            <feDropShadow dx="0" dy="4" stdDeviation="4" floodColor="#000000" floodOpacity="0.15" />
+          </filter>
+        </defs>
+
         {/* Horizontal grid lines */}
         {[0, 0.25, 0.5, 0.75, 1].map((val, idx) => {
           const y = paddingTop + val * chartHeight
@@ -340,7 +379,6 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
           const groupX = paddingLeft + idx * groupWidth
 
           const barWidth = Math.min(18, groupWidth * 0.28)
-          const barGap = 6
 
           const incomeHeight = (item.income / maxVal) * chartHeight
 
@@ -386,33 +424,50 @@ export function InteractiveBarChart({ data, height = 250 }: BarChartProps) {
             </g>
           )
         })}
-      </svg>
 
-      {/* Floating Tooltip */}
-      {hoverIndex !== null && (
-        <div
-          className="absolute z-30 pointer-events-none bg-primary text-on-primary text-xs font-semibold py-sm px-md rounded-xl shadow-lg border border-primary-container flex flex-col gap-1 w-44"
-          style={{
-            left: `${tooltipPos.x}px`,
-            top: `${tooltipPos.y}px`,
-            transform: 'translate(-50%, -100%)',
-            transition: 'left 0.05s ease, top 0.05s ease',
-          }}
-        >
-          <span className="opacity-80 text-[10px] uppercase tracking-wider text-center border-b border-primary-container/30 pb-0.5 mb-0.5">
-            {data[hoverIndex].label}
-          </span>
-          <div className="flex justify-between items-center text-xs">
-            <span className="flex items-center gap-1.5 font-normal">
-              <span className="w-2.5 h-2.5 rounded-full bg-on-primary-container" style={{ backgroundColor: '#ffffff' }}></span>
-              Receitas:
-            </span>
-            <span className="font-mono">
-              {data[hoverIndex].income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-            </span>
-          </div>
-        </div>
-      )}
+        {/* Native SVG Tooltip for Bar Chart */}
+        {hoverIndex !== null && (() => {
+          const groupWidth = chartWidth / data.length
+          const groupX = paddingLeft + hoverIndex * groupWidth + groupWidth / 2
+          
+          const tooltipWidth = 140
+          const tooltipHeight = 50
+          const tx = Math.max(10, Math.min(svgWidth - tooltipWidth - 10, groupX - tooltipWidth / 2))
+          const ty = Math.max(5, paddingTop)
+          
+          const item = data[hoverIndex]
+          const valueFormatted = item.income.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+          return (
+            <g className="pointer-events-none">
+              <rect
+                x={tx}
+                y={ty}
+                width={tooltipWidth}
+                height={tooltipHeight}
+                rx="8"
+                fill="#173124"
+                filter="url(#tooltipShadowBar)"
+              />
+              <text
+                x={tx + tooltipWidth / 2}
+                y={ty + 18}
+                textAnchor="middle"
+                className="text-[9px] font-bold fill-white/80 tracking-wider uppercase font-sans"
+              >
+                {item.label}
+              </text>
+              <text
+                x={tx + tooltipWidth / 2}
+                y={ty + 36}
+                textAnchor="middle"
+                className="text-[12px] font-bold fill-white font-mono"
+              >
+                {valueFormatted}
+              </text>
+            </g>
+          )
+        })()}
+      </svg>
     </div>
   )
 }

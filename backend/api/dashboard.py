@@ -53,7 +53,7 @@ class DashboardMensalQuerySchema(Schema):
     cliente_id: Optional[int] = Field(None, ge=1, description="ID do cliente para filtro")
     tipo_pagamento: Optional[str] = Field(
         None,
-        description="Tipo de pagamento para filtro: MENSAL, QUINZENAL ou AVULSO",
+        description="Tipo de pagamento para filtro: MENSAL ou AVULSO",
     )
 
 
@@ -66,7 +66,7 @@ class ExtratoQuerySchema(Schema):
     cliente_id: Optional[int] = Field(None, ge=1, description="ID do cliente para filtro")
     tipo_pagamento: Optional[str] = Field(
         None,
-        description="Tipo de pagamento para filtro: MENSAL, QUINZENAL ou AVULSO",
+        description="Tipo de pagamento para filtro: MENSAL ou AVULSO",
     )
 
 
@@ -110,11 +110,16 @@ def dashboard_mensal(
     tipo_pagamento = None
     if filtros.tipo_pagamento:
         tipo_pagamento = filtros.tipo_pagamento.strip().upper()
-        if tipo_pagamento in ("QUINZEMA", "QUINZENA"):
-            tipo_pagamento = "QUINZENAL"
-        tipos_validos = {"MENSAL", "QUINZENAL", "AVULSO"}
+        tipos_validos = {"MENSAL", "AVULSO"}
         if tipo_pagamento not in tipos_validos:
             return 400, {"detail": "Tipo de pagamento inválido."}
+
+    # Garante que todas as recorrências do usuário estão estendidas e geradas de forma idempotente
+    from gestao_freelas.services.recorrencia import gerar_recorrencias_usuario
+    try:
+        gerar_recorrencias_usuario(request.auth.id)
+    except Exception:
+        pass
 
     query_key = {
         "mes": mes,
@@ -154,44 +159,24 @@ def dashboard_mensal(
     total_recebido = agregados['total'] or Decimal('0.00')
     total_pagamentos = agregados['quantidade'] or 0
 
-    # Previsto = soma dos contratos recorrentes ativos usando ProjetoAtivo (MENSAL ou QUINZENAL)
-    # OU qualquer projeto do usuário que teve um pagamento recorrente no mês atual (fallbacks inteligentes)
-    hoje = date.today()
-    start_curr, end_curr = _month_range(hoje.year, hoje.month)
-    projetos_com_pagamentos_recorrentes = Pagamento.objects.filter(
-        projeto__usuario=request.auth,
-        tipo_pagamento__in=['MENSAL', 'QUINZENAL'],
-        data__gte=start_curr,
-        data__lt=end_curr
-    ).values_list('projeto_id', flat=True)
-
+    # Previsto = soma do valor_mensal de todos os contratos com recorrência MENSAL ativa
     projetos_recorrentes = Projeto.objects.filter(
-        usuario=request.auth
-    ).filter(
-        Q(projeto_ativo__ativo=True, projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']) |
-        Q(id__in=projetos_com_pagamentos_recorrentes)
-    ).distinct().select_related('projeto_ativo')
+        usuario=request.auth,
+        recorrencia_ativa=True,
+        tipo_recorrencia='MENSAL'
+    )
 
     if filtros.cliente_id:
         projetos_recorrentes = projetos_recorrentes.filter(cliente_id=filtros.cliente_id)
 
-    if tipo_pagamento:
-        if tipo_pagamento in ['MENSAL', 'QUINZENAL']:
-            projetos_recorrentes = projetos_recorrentes.filter(
-                Q(projeto_ativo__tipo_recorrencia=tipo_pagamento) |
-                Q(id__in=Pagamento.objects.filter(projeto__usuario=request.auth, tipo_pagamento=tipo_pagamento, data__gte=start_curr, data__lt=end_curr).values_list('projeto_id', flat=True))
-            )
-        else:
-            projetos_recorrentes = projetos_recorrentes.none()
-
     previsto_proximo_mes_decimal = Decimal('0.00')
     for p in projetos_recorrentes:
-        val = p.valor
+        val = p.valor_mensal
         if val is None:
-            val = p.valor_mensal
+            val = p.valor
         if val is None:
-            # Fallback para o último pagamento mensal/quinzenal recebido
-            ultimo_pag = p.pagamentos.filter(tipo_pagamento__in=['MENSAL', 'QUINZENAL']).order_by('-data').first()
+            # Fallback para o último pagamento mensal
+            ultimo_pag = p.pagamentos.filter(tipo_pagamento='MENSAL').order_by('-data').first()
             if ultimo_pag:
                 val = ultimo_pag.valor
         if val is not None:
@@ -265,9 +250,7 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
     tipo_pagamento = None
     if filtros.tipo_pagamento:
         tipo_pagamento = filtros.tipo_pagamento.strip().upper()
-        if tipo_pagamento in ("QUINZEMA", "QUINZENA"):
-            tipo_pagamento = "QUINZENAL"
-        tipos_validos = {"MENSAL", "QUINZENAL", "AVULSO"}
+        tipos_validos = {"MENSAL", "AVULSO"}
         if tipo_pagamento not in tipos_validos:
             return 400, {"detail": "Tipo de pagamento inválido."}
         pagamentos_query = pagamentos_query.filter(tipo_pagamento=tipo_pagamento)
@@ -324,7 +307,7 @@ def dashboard_previsao(request):
     start_curr, end_curr = _month_range(hoje.year, hoje.month)
     projetos_com_pagamentos_recorrentes = Pagamento.objects.filter(
         projeto__usuario=request.auth,
-        tipo_pagamento__in=['MENSAL', 'QUINZENAL'],
+        tipo_pagamento='MENSAL',
         data__gte=start_curr,
         data__lt=end_curr
     ).values_list('projeto_id', flat=True)
@@ -332,9 +315,9 @@ def dashboard_previsao(request):
     projetos_recorrentes = Projeto.objects.filter(
         usuario=request.auth
     ).filter(
-        Q(projeto_ativo__ativo=True, projeto_ativo__tipo_recorrencia__in=['MENSAL', 'QUINZENAL']) |
+        Q(recorrencia_ativa=True, tipo_recorrencia='MENSAL') |
         Q(id__in=projetos_com_pagamentos_recorrentes)
-    ).distinct().select_related('cliente', 'servico', 'projeto_ativo')
+    ).distinct().select_related('cliente', 'servico')
 
     payload = []
     for p in projetos_recorrentes:
@@ -342,11 +325,11 @@ def dashboard_previsao(request):
         if valor is None:
             valor = p.valor_mensal
         if valor is None:
-            ultimo_pag = p.pagamentos.filter(tipo_pagamento__in=['MENSAL', 'QUINZENAL']).order_by('-data').first()
+            ultimo_pag = p.pagamentos.filter(tipo_pagamento='MENSAL').order_by('-data').first()
             if ultimo_pag:
                 valor = ultimo_pag.valor
         
-        tipo_rec = p.projeto_ativo.tipo_recorrencia if hasattr(p, 'projeto_ativo') else 'MENSAL'
+        tipo_rec = p.tipo_recorrencia
         if tipo_rec == 'AVULSO':
             tipo_rec = 'MENSAL'
 

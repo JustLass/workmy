@@ -72,7 +72,7 @@ export async function http<T>(
 
   let body: BodyInit | undefined
   if (options?.body) {
-    if (method === 'PATCH') {
+    if (method === 'PATCH' || method === 'PUT') {
       body = JSON.stringify(options.body)
       headers['Content-Type'] = 'application/json'
     } else {

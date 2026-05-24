@@ -71,6 +71,10 @@ class ServicoInSchema(Schema):
     
     nome: str = Field(..., min_length=1, max_length=150, description="Nome do serviço", title="Nome")
     descricao: Optional[str] = Field(None, max_length=500, description="Descrição do serviço (opcional)", title="Descrição")
+    tags: Optional[str] = Field(None, max_length=250, description="Tags separadas por vírgula")
+    ferramentas: Optional[str] = Field(None, max_length=250, description="Ferramentas utilizadas")
+    github_repo: Optional[str] = Field(None, description="URL do repositório no GitHub")
+    imagem_base64: Optional[str] = Field(None, description="String da imagem codificada em Base64")
 
 
 class ServicoOutSchema(Schema):
@@ -78,6 +82,10 @@ class ServicoOutSchema(Schema):
     id: int = Field(..., description="ID único do serviço")
     nome: str = Field(..., description="Nome do serviço")
     descricao: Optional[str] = Field(None, description="Descrição do serviço")
+    tags: Optional[str] = Field(None, description="Tags separadas por vírgula")
+    ferramentas: Optional[str] = Field(None, description="Ferramentas utilizadas")
+    github_repo: Optional[str] = Field(None, description="URL do repositório no GitHub")
+    imagem_base64: Optional[str] = Field(None, description="String da imagem codificada em Base64 Data URL")
     criado_em: str = Field(..., description="Data de criação")
 
 
@@ -91,9 +99,7 @@ class ProjetoInSchema(Schema):
     servico_id: int = Field(..., description="ID do serviço", title="ID do serviço")
     status: Optional[str] = Field("DISCOVERY", description="Etapa atual do projeto no Kanban")
     progresso: Optional[int] = Field(0, description="Progresso de 0 a 100")
-    data_entrega: Optional[date] = Field(None, description="Prazo de entrega")
-    valor: Optional[Decimal] = Field(None, description="Valor total do projeto")
-    tipo_recorrencia: Optional[str] = Field("AVULSO", description="Tipo de recorrência: MENSAL, QUINZENAL, AVULSO")
+    tipo_recorrencia: Optional[str] = Field("AVULSO", description="Tipo de recorrência: MENSAL, AVULSO")
     ativo: Optional[bool] = Field(True, description="Indica se a recorrência está ativa")
 
 
@@ -111,8 +117,7 @@ class ProjetoOutSchema(Schema):
     criado_em: str = Field(..., description="Data de criação")
     status: str = Field(..., description="Status atual no Kanban")
     progresso: int = Field(..., description="Progresso em %")
-    data_entrega: Optional[str] = Field(None, description="Prazo de entrega")
-    valor: Optional[str] = Field(None, description="Valor total do projeto")
+    total_acumulado: str = Field("0.00", description="Total acumulado recebido neste projeto")
     tipo_recorrencia: str = Field(..., description="Tipo de recorrência")
     ativo: bool = Field(..., description="Indica se a recorrência está ativa")
 
@@ -142,23 +147,21 @@ class PagamentoInSchema(Schema):
     
     projeto_id: int = Field(..., description="ID do projeto", title="ID do projeto")
     valor: Decimal = Field(..., gt=0, description="Valor do pagamento", title="Valor")
-    tipo_pagamento: Literal["MENSAL", "AVULSO", "QUINZENAL"] = Field(
+    tipo_pagamento: Literal["MENSAL", "AVULSO"] = Field(
         ...,
-        description="Tipo do pagamento: MENSAL, AVULSO ou QUINZENAL",
+        description="Tipo do pagamento: MENSAL ou AVULSO",
         title="Tipo de pagamento"
     )
     data: date = Field(..., description="Data do pagamento ou vencimento", title="Data")
     observacao: Optional[str] = Field(None, max_length=500, description="Observação (opcional)", title="Observação")
+    comprovante_base64: Optional[str] = Field(None, description="Comprovante de pagamento em Base64")
 
     @field_validator("tipo_pagamento", mode="before")
     @classmethod
     def normalizar_tipo_pagamento(cls, value: str) -> str:
         if value is None:
             raise ValueError("Tipo de pagamento é obrigatório.")
-        tipo = str(value).strip().upper()
-        if tipo in ("QUINZEMA", "QUINZENA"):
-            tipo = "QUINZENAL"
-        return tipo
+        return str(value).strip().upper()
 
 
 class PagamentoOutSchema(Schema):
@@ -172,6 +175,7 @@ class PagamentoOutSchema(Schema):
     tipo_pagamento_display: str = Field(..., description="Tipo do pagamento legível")
     data: str = Field(..., description="Data do pagamento")
     observacao: Optional[str] = Field(None, description="Observação")
+    comprovante_base64: Optional[str] = Field(None, description="Comprovante de pagamento em Base64 Data URL")
     atualizado_em: str = Field(..., description="Data/hora da última atualização do pagamento")
 
 

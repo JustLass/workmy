@@ -31,6 +31,11 @@ class Servico(models.Model):
     
     nome = models.CharField(max_length=150)
     descricao = models.TextField(blank=True, null=True, max_length=500)
+    tags = models.CharField(max_length=250, blank=True, null=True, help_text="Tags separadas por vírgula")
+    ferramentas = models.CharField(max_length=250, blank=True, null=True, help_text="Ferramentas utilizadas")
+    github_repo = models.URLField(blank=True, null=True, help_text="Repositório do projeto no GitHub")
+    imagem_bytes = models.BinaryField(blank=True, null=True, help_text="Dados binários da imagem")
+    imagem_mime = models.CharField(max_length=50, blank=True, null=True, help_text="Tipo MIME da imagem")
     
     criado_em = models.DateTimeField(auto_now_add=True)
     deletado_em = models.DateTimeField(null=True, blank=True, help_text='Data de soft delete')
@@ -54,7 +59,6 @@ class Projeto(models.Model):
     
     TIPO_RECORRENCIA_CHOICES = [
         ('MENSAL', 'Mensal'),
-        ('QUINZENAL', 'Quinzenal'),
         ('AVULSO', 'Sem Recorrência / Avulso'),
     ]
 
@@ -131,34 +135,35 @@ class Projeto(models.Model):
     
     def clean(self):
         """Valida os dados do projeto (P2.4)"""
-        if self.data_entrega and self.data_entrega < timezone.now().date():
-            raise ValidationError({'data_entrega': 'Data de entrega não pode ser no passado'})
         if self.valor is not None and self.valor <= 0:
             raise ValidationError({'valor': 'Valor deve ser maior que zero'})
         if not (0 <= self.progresso <= 100):
             raise ValidationError({'progresso': 'Progresso deve estar entre 0 e 100'})
+            
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        
+        # Sincroniza mensalista com tipo_recorrencia e recorrencia_ativa
+        if self.tipo_recorrencia == 'MENSAL' and self.recorrencia_ativa:
+            self.mensalista = True
+        else:
+            self.mensalista = False
+            
+        super().save(*args, **kwargs)
+        
+        # Se a recorrência estiver ativa, dispara a geração de parcelas futuras de forma idempotente
+        if self.tipo_recorrencia == 'MENSAL' and self.recorrencia_ativa:
+            from gestao_freelas.services.recorrencia import gerar_parcelas_mensais
+            try:
+                gerar_parcelas_mensais(self)
+            except Exception:
+                pass
     
     def __str__(self):
         return f"{self.cliente.nome} - {self.servico.nome}"
 
 
-class ProjetoAtivo(models.Model):
-    '''DEPRECATED: Consolidado em Projeto. Este modelo será removido em versão futura.'''
-    TIPO_RECORRENCIA_CHOICES = [
-        ('MENSAL', 'Mensal'),
-        ('QUINZENAL', 'Quinzenal'),
-        ('AVULSO', 'Sem Recorrência / Avulso'),
-    ]
-    projeto = models.OneToOneField(Projeto, on_delete=models.CASCADE, related_name='projeto_ativo')
-    tipo_recorrencia = models.CharField(max_length=20, choices=TIPO_RECORRENCIA_CHOICES, default='AVULSO')
-    ativo = models.BooleanField(default=True)
-    
-    class Meta:
-        verbose_name = "ProjetoAtivo (DEPRECATED)"
-        verbose_name_plural = "ProjetosAtivos (DEPRECATED)"
-    
-    def __str__(self):
-        return f"{self.projeto} - {self.get_tipo_recorrencia_display()} - {'Ativo' if self.ativo else 'Inativo'} [DEPRECATED]"
+
 
 
 class AuditLog(models.Model):
@@ -193,7 +198,6 @@ class Pagamento(models.Model):
     # Opções simplificadas e diretas
     TIPO_PAGAMENTO_CHOICES = [
         ('MENSAL', 'Mensalidade'),
-        ('QUINZENAL', 'Quinzenal'),
         ('AVULSO', 'Pagamento Avulso / Extra'),
     ]
 
@@ -218,6 +222,8 @@ class Pagamento(models.Model):
         help_text='YYYY-MM para parcelas geradas automaticamente (idempotência)',
     )
     gerado_automaticamente = models.BooleanField(default=False)
+    comprovante_bytes = models.BinaryField(blank=True, null=True, help_text="Bytes do comprovante de pagamento")
+    comprovante_mime = models.CharField(max_length=50, blank=True, null=True, help_text="Tipo MIME do comprovante")
     deletado_em = models.DateTimeField(null=True, blank=True, help_text='Data de soft delete')
 
     class Meta:
@@ -241,6 +247,36 @@ class Pagamento(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+        
+        # Se o pagamento for do tipo MENSAL, ativa a recorrência do projeto
+        if self.tipo_pagamento == 'MENSAL':
+            proj = self.projeto
+            atualizado = False
+            if proj.tipo_recorrencia != 'MENSAL':
+                proj.tipo_recorrencia = 'MENSAL'
+                atualizado = True
+            if not proj.recorrencia_ativa:
+                proj.recorrencia_ativa = True
+                atualizado = True
+            if not proj.mensalista:
+                proj.mensalista = True
+                atualizado = True
+            if not proj.valor_mensal:
+                proj.valor_mensal = self.valor
+                atualizado = True
+            if not proj.dia_vencimento:
+                proj.dia_vencimento = self.data.day
+                atualizado = True
+                
+            if atualizado:
+                proj.save()
+                
+            # Dispara a geração idempotente
+            from gestao_freelas.services.recorrencia import gerar_parcelas_mensais
+            try:
+                gerar_parcelas_mensais(proj)
+            except Exception:
+                pass
 
     def __str__(self):
         return f"{self.get_tipo_pagamento_display()}: R$ {self.valor} - {self.projeto.cliente.nome}"

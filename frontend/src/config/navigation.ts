@@ -2,7 +2,6 @@ import type { ComponentType } from 'react'
 import {
   IconBriefcase,
   IconHome,
-  IconLink,
   IconUsers,
   IconWallet,
   IconBoard,
@@ -20,7 +19,7 @@ export const mainNavItems: NavItem[] = [
   { to: '/projetos', label: 'Projetos', shortLabel: 'Projetos', Icon: IconBoard },
   { to: '/clientes', label: 'Clientes', shortLabel: 'Clientes', Icon: IconUsers },
   { to: '/servicos', label: 'Serviços', shortLabel: 'Serviços', Icon: IconBriefcase },
-  { to: '/contratos', label: 'Contratos', shortLabel: 'Contratos', Icon: IconLink },
+
   { to: '/pagamentos', label: 'Financeiro', shortLabel: 'Financeiro', Icon: IconWallet },
 ]
 

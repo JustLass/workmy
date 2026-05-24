@@ -1,99 +1,93 @@
-# WorkMy
+# 💼 WorkMy - Gestão de Atividades Freelance
 
-Sistema fullstack para gestão de clientes, serviços, pagamentos e indicadores.
+WorkMy é uma plataforma fullstack moderna projetada para gerenciamento completo de clientes, contratos/projetos, controle financeiro de faturamento real acumulado e geração de cobranças recorrentes sob demanda de forma isolada por usuário.
 
-## Estrutura do projeto
+---
 
-- `backend/` → Django + Django Ninja (API)
-- `frontend/` → React + Vite (SPA)
+## 🛠️ Tecnologias Utilizadas
 
-## Backend
+- **Backend:** Django 6.0.3 + Django Ninja 1.6.2 (REST API de altíssima performance) + SQLite/PostgreSQL
+- **Autenticação:** JWT (JSON Web Tokens) com Django Ninja JWT
+- **Frontend:** React + Vite (Single Page Application rápida com TypeScript estrito)
+- **Design System:** Design premium com paletas Harmoniosas (HSL), layout 100% responsivo, Drawer Sidebar deslizante para mobile e gráficos de vetores (SVG) com tooltips interativos.
 
-### Executar localmente
+---
 
-```bash
-cd backend
-uv sync
-python manage.py migrate
-python manage.py runserver
+## ✨ Recursos de Destaque
+
+- **Painel Financeiro & Fluxo de Caixa:** Dashboard de faturamento com gráficos interativos que centralizam e ajustam as escalas automaticamente.
+- **Previsão Dinâmica de Receitas:** O sistema prevê o faturamento do próximo mês calculando dinamicamente a soma dos contratos recorrentes mensais ativos.
+- **Recorrência sob Demanda (Idempotente):** Geração pontual e única da mensalidade no mês corrente quando a data programada chega, evitando a poluição e pré-geração em lote de parcelas futuras não pagas.
+- **Faturamento Manual Restrito a Avulsos:** Lançamentos de pagamentos manuais são registrados estritamente como avulsos (`AVULSO`), mantendo a recorrência totalmente automatizada pelo sistema.
+- **Mídia Integrada (SQLite Media Gateway):** Upload e renderização de comprovantes de faturamento e capas de portfólio de serviços em formato Base64 diretamente no banco de dados.
+- **PDF Comercial Comercial:** Página de portfólio de serviço interativa com recurso nativo para exportação de PDF Comercial limpo e formatado via `@media print`.
+
+---
+
+## 🏗️ Estrutura do Repositório
+
+```
+workmy/
+├── backend/            # API REST (Python / Django)
+├── frontend/           # Interface do Usuário (TypeScript / React)
+├── docs/               # Documentação técnica consolidada
+└── db.sqlite3          # Banco de dados local de desenvolvimento
 ```
 
-Documentação da API: `http://127.0.0.1:8000/api/docs`
+---
 
-### Deploy no Render
+## 🚀 Como Executar Localmente
 
-Configuração recomendada do serviço:
-
-- Root Directory: *(vazio)*
-- Build Command: `cd backend && bash build.sh`
-- Start Command: `cd backend && python -m gunicorn core.wsgi:application --bind 0.0.0.0:$PORT`
-
-Variáveis de ambiente mínimas:
-
-- `DEBUG=False`
-- `SECRET_KEY=<valor-forte>`
-- `ALLOWED_HOSTS=<seu-backend>.onrender.com`
-- `DATABASE_URL=<url-do-banco>`
-- `CORS_ALLOWED_ORIGINS=https://<seu-frontend>.vercel.app`
-- `CSRF_TRUSTED_ORIGINS=https://<seu-frontend>.vercel.app,https://<seu-backend>.onrender.com`
-
-## Frontend
-
-### Executar localmente
+### 1. Backend (Django Ninja)
 
 ```bash
+# Navegue até a pasta do backend
+cd backend
+
+# Instale dependências e ative o ambiente virtual usando UV
+uv sync
+
+# Execute as migrações no banco de dados
+.venv\Scripts\python.exe manage.py migrate
+
+# Inicie o servidor de desenvolvimento
+.venv\Scripts\python.exe manage.py runserver
+```
+
+- **Servidor local:** `http://127.0.0.1:8000`
+- **Documentação Interativa (Swagger):** `http://127.0.0.1:8000/api/docs`
+
+---
+
+### 2. Frontend (React / Vite)
+
+```bash
+# Navegue até a pasta do frontend
 cd frontend
+
+# Instale as dependências
 npm install
+
+# Inicie o servidor em modo de desenvolvimento
 npm run dev
 ```
 
-Frontend local: `http://127.0.0.1:5173`
+- **Frontend local:** `http://localhost:5173`
 
-### Deploy no Vercel
+---
 
-Configuração recomendada:
+## 🌐 Deploy em Produção
 
-- Framework: `Vite`
-- Root Directory: `frontend`
-- Build Command: `npm run build`
-- Output Directory: `dist`
+### Backend (Render.com)
+- **Build Command:** `cd backend && pip install -r requirements.txt && python manage.py collectstatic --noinput && python manage.py migrate`
+- **Start Command:** `cd backend && python -m gunicorn core.wsgi:application --bind 0.0.0.0:$PORT`
 
-Variável obrigatória:
+### Frontend (Vercel)
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+- **Configuração:** O arquivo `vercel.json` na pasta do frontend realiza o redirecionamento automático das rotas do SPA para evitar erros `404` ao recarregar a página.
 
-- `VITE_API_BASE_URL=https://<seu-backend>.onrender.com/api`
+---
 
-Observações:
-
-- O frontend usa `VITE_API_BASE_URL` em `frontend/src/config.ts`.
-- Existe `frontend/vercel.json` com rewrite para SPA (evita 404 ao dar F5 em rotas como `/dashboard`).
-
-## Endpoints principais
-
-- `POST /api/auth/register`
-- `POST /api/auth/login`
-- `POST /api/auth/refresh`
-- `GET /api/clientes/`
-- `GET /api/servicos/`
-- `GET /api/projetos/`
-- `GET /api/pagamentos/`
-- `GET /api/dashboard/mensal`
-- `GET /api/dashboard/extrato`
-
-## Performance aplicada (navegação mais rápida)
-
-Para reduzir a latência ao abrir telas de detalhe:
-
-- Endpoints agregados:
-  - `GET /api/clientes/{id}/detalhe` → cliente + serviços + projetos + pagamentos
-  - `GET /api/servicos/{id}/detalhe` → serviço + projetos + clientes
-- Filtros no backend para reduzir payload:
-  - `GET /api/projetos/?cliente_id={id}`
-  - `GET /api/pagamentos/?cliente_id={id}` e `?projeto_id={id}`
-- Cache no frontend (`localStorage`) por usuário:
-  - respostas `GET` ficam persistidas até invalidação
-  - invalidação automática em `POST/PUT/DELETE` de clientes, serviços, projetos, pagamentos e dashboard
-- Preload obrigatório no boot:
-  - app só libera a navegação após carregar `clientes` e `serviços`
-  - tela de loading com animação durante bootstrap
-- UX mais rápida ao clicar:
-  - nome do cliente/serviço é passado na navegação e aparece imediatamente no detalhe.
+## 📖 Documentação Detalhada
+Para detalhes sobre diagramas de arquitetura, models de banco de dados, especificações de endpoints e fluxos de auditoria, acesse a [Documentação Consolidada do Desenvolvedor](file:///C:/Faculdade/2026/workmy/docs/README.md).

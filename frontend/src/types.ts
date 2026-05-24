@@ -24,6 +24,10 @@ export type Servico = {
   id: number
   nome: string
   descricao?: string | null
+  tags?: string | null
+  ferramentas?: string | null
+  github_repo?: string | null
+  imagem_base64?: string | null
   criado_em: string
 }
 
@@ -40,10 +44,9 @@ export type Projeto = {
   criado_em: string
   status: 'DISCOVERY' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED'
   progresso: number
-  data_entrega?: string | null
-  valor?: string | null
   tipo_recorrencia: 'MENSAL' | 'QUINZENAL' | 'AVULSO'
   ativo: boolean
+  total_acumulado: string
 }
 
 export type MensalistaResponse = {
@@ -64,6 +67,7 @@ export type Pagamento = {
   tipo_pagamento_display: string
   data: string
   observacao?: string | null
+  comprovante_base64?: string | null
   atualizado_em: string
 }
 

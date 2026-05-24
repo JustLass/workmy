@@ -11,6 +11,8 @@ from api.schemas import PagamentoInSchema, PagamentoOutSchema, ErrorSchema, Mess
 from api.auth import AuthBearer
 from api.realtime import publish
 from api.cache import get_cached_response, set_cached_response, invalidate_user_cache
+from api.servico_serializers import parse_base64_data_url
+from api.pagamento_serializers import pagamento_to_dict
 
 router = Router(tags=["Pagamentos"], auth=AuthBearer())
 
@@ -25,11 +27,6 @@ class ListPagamentosQuerySchema(Schema):
 def list_pagamentos(request, filtros: ListPagamentosQuerySchema = Query(...)):
     """
     Lista todos os pagamentos do usuário autenticado.
-    
-    **Filtros opcionais:**
-    - **projeto_id**: Filtrar por projeto específico
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     query_key = {"projeto_id": filtros.projeto_id, "cliente_id": filtros.cliente_id}
     cached = get_cached_response(request.auth.id, "pagamentos", "list", query=query_key)
@@ -49,18 +46,7 @@ def list_pagamentos(request, filtros: ListPagamentosQuerySchema = Query(...)):
     ).order_by('-data')
 
     payload = [
-        {
-            "id": p.id,
-            "projeto_id": p.projeto.id,
-            "projeto_cliente_nome": p.projeto.cliente.nome,
-            "projeto_servico_nome": p.projeto.servico.nome,
-            "valor": str(p.valor),
-            "tipo_pagamento": p.tipo_pagamento,
-            "tipo_pagamento_display": p.get_tipo_pagamento_display(),
-            "data": p.data.isoformat(),
-            "observacao": p.observacao,
-            "atualizado_em": p.atualizado_em.isoformat(),
-        }
+        pagamento_to_dict(p)
         for p in pagamentos
     ]
     return set_cached_response(request.auth.id, payload, "pagamentos", "list", query=query_key)
@@ -70,10 +56,6 @@ def list_pagamentos(request, filtros: ListPagamentosQuerySchema = Query(...)):
 def get_pagamento(request, pagamento_id: int):
     """
     Retorna um pagamento específico do usuário autenticado.
-    
-    - **pagamento_id**: ID do pagamento
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     cached = get_cached_response(request.auth.id, "pagamentos", pagamento_id)
     if cached is not None:
@@ -86,18 +68,7 @@ def get_pagamento(request, pagamento_id: int):
             'projeto__servico'
         ).get(id=pagamento_id, projeto__usuario=request.auth)
 
-        payload = {
-            "id": pagamento.id,
-            "projeto_id": pagamento.projeto.id,
-            "projeto_cliente_nome": pagamento.projeto.cliente.nome,
-            "projeto_servico_nome": pagamento.projeto.servico.nome,
-            "valor": str(pagamento.valor),
-            "tipo_pagamento": pagamento.tipo_pagamento,
-            "tipo_pagamento_display": pagamento.get_tipo_pagamento_display(),
-            "data": pagamento.data.isoformat(),
-            "observacao": pagamento.observacao,
-            "atualizado_em": pagamento.atualizado_em.isoformat(),
-        }
+        payload = pagamento_to_dict(pagamento)
         set_cached_response(request.auth.id, payload, "pagamentos", pagamento_id)
         return 200, payload
     except Pagamento.DoesNotExist:
@@ -108,14 +79,6 @@ def get_pagamento(request, pagamento_id: int):
 def create_pagamento(request, payload: Form[PagamentoInSchema]):
     """
     Cria um novo pagamento para um projeto.
-    
-    - **projeto_id**: ID do projeto (deve pertencer ao usuário autenticado)
-    - **valor**: Valor do pagamento (deve ser maior que zero)
-    - **tipo_pagamento**: Tipo do pagamento (MENSAL ou AVULSO)
-    - **data**: Data do pagamento ou vencimento
-    - **observacao**: Observação opcional
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     # Verifica se projeto existe e pertence ao usuário
     try:
@@ -127,48 +90,32 @@ def create_pagamento(request, payload: Form[PagamentoInSchema]):
         return 404, {"detail": "Projeto não encontrado ou não pertence a você"}
     
     # Valida tipo de pagamento
-    tipos_validos = ['MENSAL', 'AVULSO', 'QUINZENAL']
+    tipos_validos = ['MENSAL', 'AVULSO']
     if payload.tipo_pagamento not in tipos_validos:
-        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL, AVULSO ou QUINZENAL"}
+        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL ou AVULSO"}
+    
+    comp_bytes, comp_mime = parse_base64_data_url(payload.comprovante_base64)
     
     pagamento = Pagamento.objects.create(
         projeto=projeto,
         valor=payload.valor,
         tipo_pagamento=payload.tipo_pagamento,
         data=payload.data,
-        observacao=payload.observacao
+        observacao=payload.observacao,
+        comprovante_bytes=comp_bytes,
+        comprovante_mime=comp_mime,
     )
 
     publish(request.auth.id, 'pagamentos', 'created', meta={'pagamento_id': pagamento.id, 'projeto_id': projeto.id})
     invalidate_user_cache(request.auth.id)
     
-    return 201, {
-        "id": pagamento.id,
-        "projeto_id": projeto.id,
-        "projeto_cliente_nome": projeto.cliente.nome,
-        "projeto_servico_nome": projeto.servico.nome,
-        "valor": str(pagamento.valor),
-        "tipo_pagamento": pagamento.tipo_pagamento,
-        "tipo_pagamento_display": pagamento.get_tipo_pagamento_display(),
-        "data": pagamento.data.isoformat(),
-        "observacao": pagamento.observacao,
-        "atualizado_em": pagamento.atualizado_em.isoformat(),
-    }
+    return 201, pagamento_to_dict(pagamento)
 
 
 @router.put("/{pagamento_id}", response={200: PagamentoOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar pagamento")
 def update_pagamento(request, pagamento_id: int):
     """
     Atualiza um pagamento existente do usuário autenticado.
-    
-    - **pagamento_id**: ID do pagamento a ser atualizado
-    - **projeto_id**: Novo ID do projeto
-    - **valor**: Novo valor do pagamento
-    - **tipo_pagamento**: Novo tipo do pagamento (MENSAL ou AVULSO)
-    - **data**: Nova data do pagamento
-    - **observacao**: Nova observação
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     content_type = (request.headers.get("content-type", "") or "").lower()
     if "application/json" in content_type:
@@ -200,42 +147,37 @@ def update_pagamento(request, pagamento_id: int):
         return 404, {"detail": "Projeto não encontrado ou não pertence a você"}
     
     # Valida tipo de pagamento
-    tipos_validos = ['MENSAL', 'AVULSO', 'QUINZENAL']
+    tipos_validos = ['MENSAL', 'AVULSO']
     if payload.tipo_pagamento not in tipos_validos:
-        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL, AVULSO ou QUINZENAL"}
+        return 400, {"detail": "Tipo de pagamento inválido. Use MENSAL ou AVULSO"}
     
     pagamento.projeto = projeto
     pagamento.valor = payload.valor
     pagamento.tipo_pagamento = payload.tipo_pagamento
     pagamento.data = payload.data
     pagamento.observacao = payload.observacao
+    
+    if payload.comprovante_base64 is not None:
+        if payload.comprovante_base64 == "":
+            pagamento.comprovante_bytes = None
+            pagamento.comprovante_mime = None
+        else:
+            comp_bytes, comp_mime = parse_base64_data_url(payload.comprovante_base64)
+            pagamento.comprovante_bytes = comp_bytes
+            pagamento.comprovante_mime = comp_mime
+            
     pagamento.save()
 
     publish(request.auth.id, 'pagamentos', 'updated', meta={'pagamento_id': pagamento.id, 'projeto_id': projeto.id})
     invalidate_user_cache(request.auth.id)
     
-    return 200, {
-        "id": pagamento.id,
-        "projeto_id": projeto.id,
-        "projeto_cliente_nome": projeto.cliente.nome,
-        "projeto_servico_nome": projeto.servico.nome,
-        "valor": str(pagamento.valor),
-        "tipo_pagamento": pagamento.tipo_pagamento,
-        "tipo_pagamento_display": pagamento.get_tipo_pagamento_display(),
-        "data": pagamento.data.isoformat(),
-        "observacao": pagamento.observacao,
-        "atualizado_em": pagamento.atualizado_em.isoformat(),
-    }
+    return 200, pagamento_to_dict(pagamento)
 
 
 @router.delete("/{pagamento_id}", response={200: MessageSchema, 404: ErrorSchema}, summary="Deletar pagamento")
 def delete_pagamento(request, pagamento_id: int):
     """
     Deleta um pagamento do usuário autenticado.
-    
-    - **pagamento_id**: ID do pagamento a ser deletado
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     try:
         pagamento = Pagamento.objects.select_related('projeto', 'projeto__cliente', 'projeto__servico').get(

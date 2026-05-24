@@ -24,7 +24,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Render define RENDER=true no deploy — produção usa só o painel, nunca backend/.env
 ON_RENDER = os.environ.get('RENDER', '').lower() == 'true'
 if not ON_RENDER:
-    load_dotenv(BASE_DIR / '.env', override=False)
+    load_dotenv(BASE_DIR / '.env', override=True)
 
 _DEV_CORS = (
     'http://localhost:3000,http://localhost:5173,'

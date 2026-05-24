@@ -54,32 +54,7 @@ class ProjetoValidationTests(TestCase):
         except ValidationError:
             self.fail("Projeto com valor positivo levantou ValidationError inesperadamente")
     
-    def test_projeto_data_entrega_passada_invalida(self):
-        """Projeto com data de entrega no passado deve falhar"""
-        data_passada = timezone.now().date() - timedelta(days=1)
-        projeto = Projeto(
-            usuario=self.user,
-            cliente=self.cliente,
-            servico=self.servico,
-            data_entrega=data_passada
-        )
-        with self.assertRaises(ValidationError):
-            projeto.clean()
-    
-    def test_projeto_data_entrega_futura_valida(self):
-        """Projeto com data de entrega no futuro deve passar"""
-        data_futura = timezone.now().date() + timedelta(days=30)
-        projeto = Projeto(
-            usuario=self.user,
-            cliente=self.cliente,
-            servico=self.servico,
-            data_entrega=data_futura
-        )
-        try:
-            projeto.clean()
-        except ValidationError:
-            self.fail("Projeto com data futura levantou ValidationError inesperadamente")
-    
+
     def test_projeto_progresso_invalido_maior(self):
         """Projeto com progresso > 100 deve falhar"""
         projeto = Projeto(
@@ -205,8 +180,8 @@ class ModelConsolidationTests(TestCase):
         self.assertTrue(projeto.recorrencia_ativa)
     
     def test_projeto_tipo_recorrencia_choices(self):
-        """Projeto tipo_recorrencia deve aceitar MENSAL, QUINZENAL, AVULSO"""
-        for tipo in ['MENSAL', 'QUINZENAL', 'AVULSO']:
+        """Projeto tipo_recorrencia deve aceitar MENSAL, AVULSO"""
+        for tipo in ['MENSAL', 'AVULSO']:
             projeto = Projeto.objects.create(
                 usuario=self.user,
                 cliente=self.cliente,

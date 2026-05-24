@@ -16,7 +16,7 @@ export function PagamentosPage() {
   const [form, setForm] = useState({
     projeto_id: '',
     valor: '',
-    tipo_pagamento: 'MENSAL',
+    tipo_pagamento: 'AVULSO',
     data: '',
     observacao: '',
   })
@@ -57,7 +57,7 @@ export function PagamentosPage() {
       setForm({
         projeto_id: '',
         valor: '',
-        tipo_pagamento: 'MENSAL',
+        tipo_pagamento: 'AVULSO',
         data: '',
         observacao: '',
       })
@@ -411,17 +411,7 @@ export function PagamentosPage() {
                 />
               </label>
 
-              <label className="block text-sm font-semibold text-outline">
-                Categoria de Cobrança
-                <select
-                  value={form.tipo_pagamento}
-                  onChange={(e) => setForm((prev) => ({ ...prev, tipo_pagamento: e.target.value }))}
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                >
-                  <option value="MENSAL">Mensalidade / Recorrente</option>
-                  <option value="AVULSO">Pagamento Único / Avulso</option>
-                </select>
-              </label>
+              {/* Manual launches are always AVULSO */}
 
               <label className="block text-sm font-semibold text-outline">
                 Data do Recebimento

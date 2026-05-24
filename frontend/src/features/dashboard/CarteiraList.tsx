@@ -132,11 +132,11 @@ export function CarteiraList({ projetos, pagamentos, onRefresh }: CarteiraListPr
   if (projetos.length === 0) {
     return (
       <EmptyState
-        title="Nenhum contrato ainda"
+        title="Nenhum projeto ainda"
         description="Vincule um serviço a um cliente para ver sua carteira aqui."
         action={
-          <Link to="/contratos" className="btn btn-sm">
-            Criar contrato
+          <Link to="/projetos" className="btn btn-sm">
+            Criar projeto
           </Link>
         }
       />

@@ -7,6 +7,7 @@ from django.db.models import Sum, Value, DecimalField
 from django.db.models.functions import Coalesce
 from gestao_freelas.models import Servico, Projeto, Cliente
 from api.projeto_serializers import projeto_to_dict
+from api.servico_serializers import servico_to_dict, parse_base64_data_url
 from api.schemas import ServicoInSchema, ServicoOutSchema, ServicoDetailOutSchema, ErrorSchema, MessageSchema
 from api.cache import get_cached_response, set_cached_response, invalidate_user_cache
 from api.auth import AuthBearer
@@ -27,12 +28,7 @@ def list_servicos(request):
 
     servicos = Servico.objects.filter(usuario=request.auth).order_by('-criado_em')
     payload = [
-        {
-            "id": s.id,
-            "nome": s.nome,
-            "descricao": s.descricao,
-            "criado_em": s.criado_em.isoformat()
-        }
+        servico_to_dict(s)
         for s in servicos
     ]
     return set_cached_response(request.auth.id, payload, "servicos", "list")
@@ -53,12 +49,7 @@ def get_servico(request, servico_id: int):
 
     try:
         servico = Servico.objects.get(id=servico_id, usuario=request.auth)
-        payload = {
-            "id": servico.id,
-            "nome": servico.nome,
-            "descricao": servico.descricao,
-            "criado_em": servico.criado_em.isoformat()
-        }
+        payload = servico_to_dict(servico)
         set_cached_response(request.auth.id, payload, "servicos", servico_id)
         return 200, payload
     except Servico.DoesNotExist:
@@ -102,12 +93,7 @@ def get_servico_detalhe(request, servico_id: int):
     )
 
     payload = {
-        "servico": {
-            "id": servico.id,
-            "nome": servico.nome,
-            "descricao": servico.descricao,
-            "criado_em": servico.criado_em.isoformat(),
-        },
+        "servico": servico_to_dict(servico),
         "projetos": [
             projeto_to_dict(projeto)
             for projeto in projetos
@@ -132,54 +118,52 @@ def get_servico_detalhe(request, servico_id: int):
 def create_servico(request, payload: Form[ServicoInSchema]):
     """
     Cria um novo serviço para o usuário autenticado.
-    
-    - **nome**: Nome do serviço (obrigatório)
-    - **descricao**: Descrição do serviço (opcional)
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
+    image_bytes, mime_type = parse_base64_data_url(payload.imagem_base64)
     servico = Servico.objects.create(
         usuario=request.auth,
         nome=payload.nome,
-        descricao=payload.descricao
+        descricao=payload.descricao,
+        tags=payload.tags,
+        ferramentas=payload.ferramentas,
+        github_repo=payload.github_repo,
+        imagem_bytes=image_bytes,
+        imagem_mime=mime_type,
     )
     invalidate_user_cache(request.auth.id)
 
-    return 201, {
-        "id": servico.id,
-        "nome": servico.nome,
-        "descricao": servico.descricao,
-        "criado_em": servico.criado_em.isoformat()
-    }
+    return 201, servico_to_dict(servico)
 
 
 @router.put("/{servico_id}", response={200: ServicoOutSchema, 404: ErrorSchema}, summary="Atualizar serviço")
-def update_servico(request, servico_id: int, payload: Form[ServicoInSchema]):
+def update_servico(request, servico_id: int, payload: ServicoInSchema):
     """
     Atualiza um serviço existente do usuário autenticado.
-    
-    - **servico_id**: ID do serviço a ser atualizado
-    - **nome**: Novo nome do serviço
-    - **descricao**: Nova descrição do serviço (opcional)
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     try:
         servico = Servico.objects.get(id=servico_id, usuario=request.auth)
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado"}
     
+    image_bytes, mime_type = parse_base64_data_url(payload.imagem_base64)
     servico.nome = payload.nome
     servico.descricao = payload.descricao
+    servico.tags = payload.tags
+    servico.ferramentas = payload.ferramentas
+    servico.github_repo = payload.github_repo
+    
+    if payload.imagem_base64 is not None:
+        if payload.imagem_base64 == "":
+            servico.imagem_bytes = None
+            servico.imagem_mime = None
+        else:
+            servico.imagem_bytes = image_bytes
+            servico.imagem_mime = mime_type
+            
     servico.save()
     invalidate_user_cache(request.auth.id)
     
-    return 200, {
-        "id": servico.id,
-        "nome": servico.nome,
-        "descricao": servico.descricao,
-        "criado_em": servico.criado_em.isoformat()
-    }
+    return 200, servico_to_dict(servico)
 
 
 @router.delete("/{servico_id}", response={200: MessageSchema, 404: ErrorSchema, 409: ErrorSchema}, summary="Deletar serviço")
@@ -189,10 +173,6 @@ def delete_servico(request, servico_id: int):
     
     **ATENÇÃO:** Só é possível deletar serviço sem projetos associados!
     Se houver projetos, retorna erro 409 (Conflict).
-    
-    - **servico_id**: ID do serviço a ser deletado
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     try:
         servico = Servico.objects.get(id=servico_id, usuario=request.auth)

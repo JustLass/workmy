@@ -165,10 +165,9 @@ export async function demoRequest<T>(
       criado_em: new Date().toISOString(),
       status: (body.status || 'DISCOVERY') as any,
       progresso: Number(body.progresso || 0),
-      data_entrega: body.data_entrega || null,
-      valor: body.valor || null,
       tipo_recorrencia: (body.tipo_recorrencia || 'AVULSO') as any,
       ativo: body.ativo !== 'false',
+      total_acumulado: '0.00',
     }
     store.projetos.push(projeto)
     saveDemoStore(store)
@@ -204,12 +203,11 @@ export async function demoRequest<T>(
       ...proj,
       status,
       progresso,
-      data_entrega: body.data_entrega || null,
-      valor: body.valor || null,
       tipo_recorrencia: (body.tipo_recorrencia || proj.tipo_recorrencia) as any,
       ativo: body.ativo !== 'false',
       mensalista: body.tipo_recorrencia === 'MENSAL',
       valor_mensal: body.tipo_recorrencia === 'MENSAL' ? body.valor || null : null,
+      total_acumulado: proj.total_acumulado || '0.00',
     }
     saveDemoStore(store)
     notifyDemoMutation()

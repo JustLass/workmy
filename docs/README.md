@@ -1,16 +1,149 @@
-# Documentação WorkMy API
+# 📚 Documentação Técnica do Desenvolvedor - WorkMy API
 
-## Índice
+Este documento reúne todas as especificações técnicas, diagramas de banco de dados, regras de negócio da máquina de faturamento e especificações de endpoints para desenvolvedores da plataforma WorkMy.
 
-- [Arquitetura](ARCHITECTURE.md)
-- [API](API.md)
-- [Regras de Negócio](BUSINESS_RULES.md)
-- [Segurança](SECURITY.md)
-- [Deploy](DEPLOY.md)
-- [Testes](TESTING.md)
-- [Integração Vercel + Render](VERCEL_RENDER_INTEGRATION.md)
+> [!TIP]
+> Para obter uma análise aprofundada da arquitetura do sistema, separação de responsabilidades (MVC/REST), integração com a nuvem do **Supabase (PostgreSQL)**, caching de dados e decisões de design estruturadas de nível Staff, consulte o documento: [docs/ARCHITECTURE.md](file:///C:/Faculdade/2026/workmy/docs/ARCHITECTURE.md).
 
-## Acesso rápido
+---
 
-- Swagger local: `http://127.0.0.1:8000/api/docs`
-- OpenAPI JSON: `http://127.0.0.1:8000/api/openapi.json`
+## 🗃️ Modelo de Dados & Banco de Dados (SQLite/PostgreSQL)
+
+O banco de dados do WorkMy foi projetado com isolamento total por usuário através de chaves estrangeiras que vinculam todos os recursos diretamente ao modelo `Usuario` (`usuarios.Usuario`).
+
+```
+Usuario (AbstractUser)
+  ├── Cliente (1:N)
+  ├── Servico (1:N)
+  └── Projeto (1:N) ── Pagamento (1:N)
+```
+
+### 1. Usuario (`usuarios.Usuario`)
+Modelo estendido do Django `AbstractUser` que implementa autenticação via JWT:
+- `email`: `EmailField` (único)
+- `telefone`: `CharField(max_length=20, null=True, blank=True)`
+
+### 2. Cliente (`gestao_freelas.Cliente`)
+Cadastro comercial de clientes pertencentes ao usuário:
+- `usuario`: `ForeignKey(Usuario)`
+- `nome`: `CharField(max_length=100)`
+- `email`: `EmailField(null=True, blank=True)`
+- `telefone`: `CharField(max_length=20, null=True, blank=True)`
+
+### 3. Servico (`gestao_freelas.Servico`)
+Catálogo de serviços oferecidos com suporte a tags e banner de mídia:
+- `usuario`: `ForeignKey(Usuario)`
+- `nome`: `CharField(max_length=150)`
+- `descricao`: `TextField(max_length=500)`
+- `tags`: `CharField(max_length=250)` (separadas por vírgula para filtros rápidos)
+- `ferramentas`: `CharField(max_length=250)` (tecnologias utilizadas)
+- `github_repo`: `URLField`
+- `imagem_bytes`: `BinaryField` (dados da capa do serviço em Base64)
+- `imagem_mime`: `CharField(max_length=50)` (Tipo MIME da capa)
+
+### 4. Projeto (`gestao_freelas.Projeto`)
+Representa um contrato/vínculo entre cliente e serviço:
+- `usuario`: `ForeignKey(Usuario)`
+- `cliente`: `ForeignKey(Cliente)`
+- `servico`: `ForeignKey(Servico)`
+- `status`: `CharField` (`DISCOVERY`, `IN_PROGRESS`, `REVIEW`, `COMPLETED`)
+- `recorrencia_ativa`: `BooleanField` (Indica se a cobrança recorrente está habilitada)
+- `tipo_recorrencia`: `CharField` (`MENSAL`, `AVULSO`)
+- `valor_mensal`: `DecimalField` (Valor de cobrança mensal automatizada)
+- `dia_vencimento`: `PositiveSmallIntegerField` (Dia do mês de cobrança, entre 1-28)
+- `recorrencia_inicio`: `DateField` (Data de início do plano)
+- `mensalista`: `BooleanField` (Marcado automaticamente pelo sistema se há mensalidade configurada e ativa)
+
+### 5. Pagamento (`gestao_freelas.Pagamento`)
+Lançamentos financeiros de receitas associados a um Projeto:
+- `projeto`: `ForeignKey(Projeto)`
+- `valor`: `DecimalField`
+- `tipo_pagamento`: `CharField` (`MENSAL` para mensalidades geradas e `AVULSO` para extras/manuais)
+- `data`: `DateField` (Data do recebimento ou vencimento)
+- `referencia_mes`: `CharField` (Identificador temporal `YYYY-MM` para garantir a idempotência da recorrência)
+- `gerado_automaticamente`: `BooleanField`
+- `comprovante_bytes`: `BinaryField` (dados da imagem do comprovante anexado)
+- `comprovante_mime`: `CharField(max_length=50)`
+- `deletado_em`: `DateTimeField` (soft delete)
+
+---
+
+## ⚙️ Regras de Negócio: O Motor de Faturamento Recorrente
+
+O fluxo financeiro do WorkMy foi projetado sob duas premissas fundamentais: **sem pré-geração em lote** e **idempotência estrita**.
+
+### 1. Cobrança Recorrente sob Demanda
+- Não existem dezenas de lançamentos futuros "vazios".
+- A mensalidade é gerada **exclusivamente uma vez para o mês atual** (`referencia_mes = YYYY-MM`) quando:
+  1. A recorrência está ativa (`recorrencia_ativa = True` e `tipo_recorrencia = 'MENSAL'`).
+  2. O dia do mês atual é **igual ou maior** ao `dia_vencimento` programado.
+  3. Não existe nenhum pagamento cadastrado para o projeto com o identificador de referência temporal do mês atual.
+- Este fluxo é ativado no boot diário do sistema ou quando o usuário cria novos contratos/pagamentos.
+
+### 2. Restrição de Lançamentos Manuais
+- Formulários manuais de adição ou edição de pagamentos na interface criam lançamentos classificados estritamente como **Avulsos** (`AVULSO`).
+- Isso evita que o faturamento de mensalidades seja gerado em duplicidade manual.
+
+### 3. Previsão de Faturamento (`Previsão do Mês que Vem`)
+- O cálculo da previsão de receitas para o mês seguinte é dinâmico e preciso:
+  - Realiza a soma do `valor_mensal` de todos os projetos cuja recorrência está ativa no banco de dados.
+
+---
+
+## 🔌 API Endpoints (Base URL: `/api/v1`)
+
+Todos os endpoints (exceto os de registro e login) exigem cabeçalho de autenticação JWT: `Authorization: Bearer <access_token>`.
+
+### 1. Autenticação (`/auth`)
+- `POST /auth/register` - Cria uma nova conta de usuário.
+- `POST /auth/login` - Autentica o usuário e retorna `access` e `refresh` tokens.
+- `POST /auth/refresh` - Renova o `access_token` usando o `refresh_token`.
+- `GET /auth/me` - Retorna informações da conta do usuário logado.
+
+### 2. Clientes (`/clientes`)
+- `GET /clientes/` - Lista todos os clientes (com lucro acumulado).
+- `POST /clientes/` - Registra um novo cliente.
+- `GET /clientes/{id}/detalhe` - Agrega cliente, serviços prestados, contratos e histórico financeiro em uma única requisição rápida.
+- `PUT /clientes/{id}` - Atualiza dados do cliente (JSON).
+- `DELETE /clientes/{id}` - Soft-delete do cliente.
+
+### 3. Serviços (`/servicos`)
+- `GET /servicos/` - Catálogo de serviços com suporte a busca e tags.
+- `POST /servicos/` - Registra novo serviço (suporta imagem Base64).
+- `GET /servicos/{id}/detalhe` - Retorna o serviço e todos os projetos vinculados.
+- `PUT /servicos/{id}` - Atualiza serviço (JSON).
+- `DELETE /servicos/{id}` - Soft-delete do serviço.
+
+### 4. Projetos (`/projetos`)
+- `GET /projetos/` - Lista todos os contratos com acumulado real.
+- `POST /projetos/` - Cria novo contrato.
+- `PATCH /projetos/{id}/mensalista` - Ativa ou pausa a recorrência mensal.
+- `PUT /projetos/{id}` - Atualiza dados do contrato (JSON).
+- `DELETE /projetos/{id}` - Soft-delete do contrato.
+
+### 5. Pagamentos (`/pagamentos`)
+- `GET /pagamentos/` - Histórico financeiro geral.
+- `POST /pagamentos/` - Registra pagamento manual (Avulso).
+- `PUT /pagamentos/{id}` - Atualiza valor ou dados (JSON).
+- `DELETE /pagamentos/{id}` - Exclui lançamento financeiro.
+
+### 6. Dashboard (`/dashboard`)
+- `GET /dashboard/mensal` - Estatísticas financeiras agregadas, fluxo de caixa e previsto do mês.
+- `GET /dashboard/previsao` - Lista detalhada de receitas previstas para o próximo mês.
+
+---
+
+## 🔒 Auditoria de Dados (`AuditLog`)
+Toda ação de mutação de dados (`CREATE`, `UPDATE`, `DELETE`) nos modelos principais gera um registro de histórico de auditoria na tabela `AuditLog`, registrando:
+- O usuário que realizou a alteração.
+- O tipo e ID do recurso mutado.
+- O estado anterior (`dados_anterior` em JSON) e o novo estado (`dados_novo` em JSON).
+
+---
+
+## 🧪 Estrutura de Testes Automatizados
+O backend possui suíte de testes robusta em Django TestCase (`gestao_freelas/tests.py`).
+Para executar as validações locais:
+```bash
+python manage.py test
+```

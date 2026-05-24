@@ -95,6 +95,7 @@ export function createDemoSeed(): {
       progresso: 65,
       tipo_recorrencia: 'MENSAL',
       ativo: true,
+      total_acumulado: '10500.00',
     },
     {
       id: 2,
@@ -111,6 +112,7 @@ export function createDemoSeed(): {
       progresso: 15,
       tipo_recorrencia: 'QUINZENAL',
       ativo: true,
+      total_acumulado: '4800.00',
     },
     {
       id: 3,
@@ -127,6 +129,7 @@ export function createDemoSeed(): {
       progresso: 90,
       tipo_recorrencia: 'AVULSO',
       ativo: false,
+      total_acumulado: '2200.00',
     },
   ]
 

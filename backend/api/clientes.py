@@ -8,6 +8,8 @@ from django.db.models import Sum, Value, DecimalField
 from django.db.models.functions import Coalesce
 from gestao_freelas.models import Cliente, Servico, Projeto, Pagamento
 from api.projeto_serializers import projeto_to_dict
+from api.servico_serializers import servico_to_dict
+from api.pagamento_serializers import pagamento_to_dict
 from api.schemas import (
     ClienteInSchema,
     ClienteOutSchema,
@@ -25,8 +27,6 @@ router = Router(tags=["Clientes"], auth=AuthBearer())
 def list_clientes(request):
     """
     Lista todos os clientes do usuário autenticado.
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     cached = get_cached_response(request.auth.id, "clientes", "list")
     if cached is not None:
@@ -61,10 +61,6 @@ def list_clientes(request):
 def get_cliente(request, cliente_id: int):
     """
     Retorna um cliente específico do usuário autenticado.
-    
-    - **cliente_id**: ID do cliente
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     cached = get_cached_response(request.auth.id, "clientes", cliente_id)
     if cached is not None:
@@ -142,12 +138,7 @@ def get_cliente_detalhe(request, cliente_id: int):
             "criado_em": cliente.criado_em.isoformat(),
         },
         "servicos": [
-            {
-                "id": s.id,
-                "nome": s.nome,
-                "descricao": s.descricao,
-                "criado_em": s.criado_em.isoformat(),
-            }
+            servico_to_dict(s)
             for s in servicos
         ],
         "projetos": [
@@ -155,18 +146,7 @@ def get_cliente_detalhe(request, cliente_id: int):
             for p in projetos
         ],
         "pagamentos": [
-            {
-                "id": pag.id,
-                "projeto_id": pag.projeto.id,
-                "projeto_cliente_nome": pag.projeto.cliente.nome,
-                "projeto_servico_nome": pag.projeto.servico.nome,
-                "valor": str(pag.valor),
-                "tipo_pagamento": pag.tipo_pagamento,
-                "tipo_pagamento_display": pag.get_tipo_pagamento_display(),
-                "data": pag.data.isoformat(),
-                "observacao": pag.observacao,
-                "atualizado_em": pag.atualizado_em.isoformat(),
-            }
+            pagamento_to_dict(pag)
             for pag in pagamentos
         ],
     }
@@ -178,12 +158,6 @@ def get_cliente_detalhe(request, cliente_id: int):
 def create_cliente(request, payload: Form[ClienteInSchema]):
     """
     Cria um novo cliente para o usuário autenticado.
-    
-    - **nome**: Nome do cliente (obrigatório)
-    - **email**: Email do cliente (opcional, pode se repetir)
-    - **telefone**: Telefone do cliente (opcional, validado no padrão brasileiro)
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     cliente = Cliente.objects.create(
         usuario=request.auth,
@@ -205,16 +179,9 @@ def create_cliente(request, payload: Form[ClienteInSchema]):
 
 
 @router.put("/{cliente_id}", response={200: ClienteOutSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Atualizar cliente")
-def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
+def update_cliente(request, cliente_id: int, payload: ClienteInSchema):
     """
     Atualiza um cliente existente do usuário autenticado.
-    
-    - **cliente_id**: ID do cliente a ser atualizado
-    - **nome**: Novo nome do cliente
-    - **email**: Novo email do cliente (opcional)
-    - **telefone**: Novo telefone do cliente (opcional)
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     try:
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)
@@ -250,13 +217,6 @@ def update_cliente(request, cliente_id: int, payload: Form[ClienteInSchema]):
 def delete_cliente(request, cliente_id: int):
     """
     Deleta um cliente do usuário autenticado.
-    
-    **ATENÇÃO:** Só é possível deletar cliente sem projetos associados!
-    Se houver projetos, retorna erro 409 (Conflict).
-    
-    - **cliente_id**: ID do cliente a ser deletado
-    
-    **Requer autenticação:** Bearer token no header Authorization.
     """
     try:
         cliente = Cliente.objects.get(id=cliente_id, usuario=request.auth)

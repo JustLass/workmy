@@ -107,13 +107,12 @@ export function ClientesPage() {
 
   // Derived stats
   const totalClients = items.length
-  const retainersCount = items.filter((c) => Number(c.total_acumulado || 0) > 10000).length
   const activeLeads = items.filter((c) => Number(c.total_acumulado || 0) === 0).length
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       {/* Quick Stats Organic Section */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-lg mb-xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-xl">
         <div className="organic-card rounded-xl p-lg flex items-center justify-between bg-white border border-outline-variant/30">
           <div>
             <p className="text-on-secondary-container text-label-sm font-bold uppercase tracking-widest text-xs">Clientes Totais</p>
@@ -121,15 +120,6 @@ export function ClientesPage() {
           </div>
           <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary">
             <span className="material-symbols-outlined text-headline-md">groups</span>
-          </div>
-        </div>
-        <div className="organic-card rounded-xl p-lg flex items-center justify-between bg-white border border-outline-variant/30">
-          <div>
-            <p className="text-on-secondary-container text-label-sm font-bold uppercase tracking-widest text-xs">Contratos Ativos</p>
-            <h2 className="text-display-lg font-display-lg text-primary leading-none mt-xs text-3xl font-extrabold">{retainersCount}</h2>
-          </div>
-          <div className="w-14 h-14 rounded-full bg-secondary-container flex items-center justify-center text-on-secondary-container">
-            <span className="material-symbols-outlined text-headline-md">rebase_edit</span>
           </div>
         </div>
         <div className="organic-card rounded-xl p-lg flex items-center justify-between bg-white border border-outline-variant/30">
@@ -169,12 +159,9 @@ export function ClientesPage() {
 
       {error && <p className="error mb-md text-error bg-error-container/40 p-sm rounded-lg border border-error-container">{error}</p>}
 
-      {/* Directory Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-lg">
         {filteredItems.map((item) => {
           const revNum = Number(item.total_acumulado || 0)
-          const target = 50000
-          const progressPercent = Math.min(100, Math.round((revNum / target) * 100))
 
           return (
             <div className="organic-card rounded-xl p-lg group cursor-pointer transition-all bg-white" key={item.id}>
@@ -192,14 +179,9 @@ export function ClientesPage() {
                 <Link to={`/clientes/${item.id}`} className="hover:underline">{item.nome}</Link>
               </h4>
               <p className="text-on-secondary-container font-body-md mb-lg text-sm">{item.email || 'Sem E-mail'} • {item.telefone || 'Sem Telefone'}</p>
-              <div className="space-y-md mb-lg">
-                <div className="flex justify-between items-end">
-                  <span className="text-on-surface-variant text-label-sm opacity-70">Receita Acumulada</span>
-                  <span className="text-primary font-mono-data text-body-lg font-bold">{formatCurrency(item.total_acumulado)}</span>
-                </div>
-                <div className="w-full bg-surface-container-high h-2 rounded-full overflow-hidden">
-                  <div className="bg-primary h-full rounded-full" style={{ width: `${progressPercent}%`, transition: 'width 0.8s ease' }}></div>
-                </div>
+              <div className="pt-2 pb-2 mb-lg flex justify-between items-center border-t border-b border-outline/5">
+                <span className="text-on-surface-variant text-sm opacity-70">Receita Acumulada</span>
+                <span className="text-primary font-mono-data text-body-lg font-bold text-lg">{formatCurrency(item.total_acumulado)}</span>
               </div>
               <div className="pt-md border-t border-outline/10 flex items-center justify-between">
                 <div className="flex items-center gap-xs">

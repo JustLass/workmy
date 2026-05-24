@@ -22,12 +22,137 @@ export function ClienteDetailPage() {
   const [novoPagamento, setNovoPagamento] = useState({
     projeto_id: '',
     valor: '',
-    tipo_pagamento: 'MENSAL',
+    tipo_pagamento: 'AVULSO',
     data: '',
     observacao: '',
   })
+  const [comprovanteBase64, setComprovanteBase64] = useState<string>('')
+  const [fileKey, setFileKey] = useState(0)
+  const [activeReceipt, setActiveReceipt] = useState<string | null>(null)
+  
   const [servicoId, setServicoId] = useState('')
   const [error, setError] = useState('')
+
+  // Estados e Handlers para Recorrência Mensal
+  const [recorrenciaModalProjeto, setRecorrenciaModalProjeto] = useState<Projeto | null>(null)
+  const [recorrenciaForm, setRecorrenciaForm] = useState({ valor_mensal: '', dia_vencimento: '5' })
+
+  // Estados e Handlers para Edição de Lançamento (Pagamento)
+  const [editingPagamento, setEditingPagamento] = useState<{
+    id: number
+    projeto_id: number
+    valor: string
+    tipo_pagamento: string
+    data: string
+    observacao: string
+    comprovante_base64?: string
+  } | null>(null)
+  const [editFileKey, setEditFileKey] = useState(100)
+  const [editComprovanteBase64, setEditComprovanteBase64] = useState<string>('')
+
+  const handleDesativarRecorrencia = async (projetoId: number) => {
+    if (!window.confirm('Desativar a recorrência mensal para este projeto? As parcelas futuras automáticas não serão mais geradas.')) return
+    setError('')
+    try {
+      await request(`/projetos/${projetoId}/mensalista`, {
+        method: 'PATCH',
+        body: { ativo: false },
+      })
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao desativar recorrência')
+    }
+  }
+
+  const onAtivarRecorrenciaSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!recorrenciaModalProjeto) return
+    const valor = recorrenciaForm.valor_mensal.trim().replace(',', '.')
+    if (!valor || Number(valor) <= 0) {
+      alert('Informe um valor de mensalidade válido.')
+      return
+    }
+    setError('')
+    try {
+      await request(`/projetos/${recorrenciaModalProjeto.id}/mensalista`, {
+        method: 'PATCH',
+        body: {
+          ativo: true,
+          valor_mensal: valor,
+          dia_vencimento: Number(recorrenciaForm.dia_vencimento),
+        },
+      })
+      setRecorrenciaModalProjeto(null)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao ativar recorrência')
+    }
+  }
+
+  const handleStartEditPagamento = (row: any) => {
+    const proj = projetos.find((p) => p.servico_nome === row.servico)
+    setEditingPagamento({
+      id: row.id,
+      projeto_id: proj ? proj.id : (projetos[0] ? projetos[0].id : 0),
+      valor: String(row.valor),
+      tipo_pagamento: row.tipo_pagamento,
+      data: row.data,
+      observacao: row.observacao || '',
+    })
+    setEditComprovanteBase64(row.comprovante_base64 || '')
+    setEditFileKey((k) => k + 1)
+  }
+
+  const handleEditFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setEditComprovanteBase64('')
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setEditComprovanteBase64(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const onUpdatePagamentoSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingPagamento) return
+    const valorNormalizado = editingPagamento.valor.trim().replace(',', '.')
+    if (!valorNormalizado) {
+      alert('Informe o valor.')
+      return
+    }
+    const valorNumerico = Number(valorNormalizado)
+    if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+      alert('Valor inválido. Informe um número maior que zero.')
+      return
+    }
+    if (!editingPagamento.data) {
+      alert('Informe a data.')
+      return
+    }
+    setError('')
+    try {
+      await request(`/pagamentos/${editingPagamento.id}`, {
+        method: 'PUT',
+        body: {
+          projeto_id: editingPagamento.projeto_id,
+          valor: valorNormalizado,
+          tipo_pagamento: editingPagamento.tipo_pagamento,
+          data: editingPagamento.data,
+          observacao: editingPagamento.observacao,
+          comprovante_base64: editComprovanteBase64 || undefined,
+        },
+      })
+      setEditingPagamento(null)
+      setEditComprovanteBase64('')
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar pagamento')
+    }
+  }
 
   const load = useCallback(async () => {
     if (!clienteId) return
@@ -55,6 +180,19 @@ export function ClienteDetailPage() {
     }, 0)
     return () => window.clearTimeout(timer)
   }, [load])
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) {
+      setComprovanteBase64('')
+      return
+    }
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setComprovanteBase64(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
 
   const onVincularServico = async () => {
     const parsedServicoId = Number(servicoId)
@@ -106,15 +244,18 @@ export function ClienteDetailPage() {
           tipo_pagamento: novoPagamento.tipo_pagamento,
           data: novoPagamento.data,
           observacao: novoPagamento.observacao,
+          comprovante_base64: comprovanteBase64 || undefined,
         },
       })
       setNovoPagamento((prev) => ({
         ...prev,
         valor: '',
-        tipo_pagamento: 'MENSAL',
+        tipo_pagamento: 'AVULSO',
         data: '',
         observacao: '',
       }))
+      setComprovanteBase64('')
+      setFileKey((k) => k + 1)
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao adicionar pagamento')
@@ -153,17 +294,20 @@ export function ClienteDetailPage() {
           servico: projeto.servico_nome,
           valor: Number(pagamento.valor),
           tipo_pagamento: pagamento.tipo_pagamento,
+          observacao: pagamento.observacao,
+          comprovante_base64: pagamento.comprovante_base64,
         }
       })
       .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
   }, [cliente?.nome, pagamentos, projetos])
 
   const exportarCsv = () => {
-    const header = ['NOME', 'DATA', 'SERVIÇO', 'VALOR']
+    const header = ['NOME', 'DATA', 'SERVIÇO', 'DESCRIÇÃO', 'VALOR']
     const rows = extrato.map((row) => [
       row.nome,
       formatDate(row.data),
       row.servico,
+      row.observacao || '',
       row.valor.toFixed(2).replace('.', ','),
     ])
     const csv = [header, ...rows]
@@ -281,20 +425,7 @@ export function ClienteDetailPage() {
                 />
               </label>
 
-              <label className="block text-sm font-semibold text-outline">
-                Tipo de Cobrança
-                <select
-                  value={novoPagamento.tipo_pagamento}
-                  onChange={(e) =>
-                    setNovoPagamento((prev) => ({ ...prev, tipo_pagamento: e.target.value }))
-                  }
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
-                >
-                  <option value="MENSAL">Mensalidade</option>
-                  <option value="AVULSO">Avulso</option>
-                  <option value="QUINZENAL">Quinzenal</option>
-                </select>
-              </label>
+              {/* Manual faturamento launches are always AVULSO */}
 
               <label className="block text-sm font-semibold text-outline">
                 Data do Pagamento
@@ -307,7 +438,7 @@ export function ClienteDetailPage() {
               </label>
 
               <label className="block text-sm font-semibold text-outline">
-                Observação / Memorando
+                Descrição / Memorando
                 <input
                   placeholder="Ex: Pagamento referente ao setup inicial..."
                   className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
@@ -315,6 +446,17 @@ export function ClienteDetailPage() {
                   onChange={(e) =>
                     setNovoPagamento((prev) => ({ ...prev, observacao: e.target.value }))
                   }
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Anexar Comprovante (Imagem)
+                <input
+                  key={fileKey}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="mt-1 w-full text-xs text-on-surface file:mr-md file:py-xs file:px-sm file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
                 />
               </label>
 
@@ -342,25 +484,61 @@ export function ClienteDetailPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10">
+                  <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10 text-xs">
                     <th className="px-lg py-md font-semibold">Serviço Vinculado</th>
                     <th className="px-lg py-md font-semibold">Cód. Contrato</th>
+                    <th className="px-lg py-md font-semibold">Plano Recorrente</th>
+                    <th className="px-lg py-md font-semibold text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="text-body-md divide-y divide-outline-variant/20">
                   {projetos.map((projeto) => (
-                    <tr key={projeto.id} className="hover:bg-primary-fixed/5 transition-all">
+                    <tr key={projeto.id} className="hover:bg-primary-fixed/5 transition-all text-sm">
                       <td className="px-lg py-lg font-bold text-on-surface">
                         {projeto.servico_nome}
                       </td>
                       <td className="px-lg py-lg text-on-surface-variant font-mono-data text-xs">
                         CTR-2026-{projeto.id}
                       </td>
+                      <td className="px-lg py-lg text-on-surface-variant text-xs">
+                        {projeto.mensalista && projeto.ativo ? (
+                          <span className="text-primary font-bold">
+                            Ativo (R$ {projeto.valor_mensal}/mês, dia {projeto.dia_vencimento})
+                          </span>
+                        ) : (
+                          <span className="opacity-55 italic">Inativo / Avulso</span>
+                        )}
+                      </td>
+                      <td className="px-lg py-lg text-right">
+                        {projeto.mensalista && projeto.ativo ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleDesativarRecorrencia(projeto.id)}
+                            className="bg-error/10 text-error border border-error/25 hover:bg-error hover:text-white transition-all py-1 px-3 rounded-lg text-xs font-bold active:scale-95 select-none"
+                          >
+                            Parar Cobrança Recorrente
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setRecorrenciaModalProjeto(projeto)
+                              setRecorrenciaForm({
+                                valor_mensal: projeto.valor_mensal || '1000',
+                                dia_vencimento: String(projeto.dia_vencimento || '5'),
+                              })
+                            }}
+                            className="bg-primary/10 text-primary border border-primary/25 hover:bg-primary hover:text-white transition-all py-1 px-3 rounded-lg text-xs font-bold active:scale-95 select-none"
+                          >
+                            Ativar Cobrança Recorrente
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                   {projetos.length === 0 && (
                     <tr>
-                      <td colSpan={2} className="text-center py-lg text-secondary">
+                      <td colSpan={4} className="text-center py-lg text-secondary">
                         Nenhum contrato de serviço ativo para este cliente.
                       </td>
                     </tr>
@@ -386,44 +564,73 @@ export function ClienteDetailPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10">
-                    <th className="px-lg py-md font-semibold">Nome</th>
-                    <th className="px-lg py-md font-semibold">Data</th>
-                    <th className="px-lg py-md font-semibold">Serviço</th>
-                    <th className="px-lg py-md font-semibold">Categoria</th>
-                    <th className="px-lg py-md font-semibold">Valor</th>
-                    <th className="px-lg py-md text-right font-semibold">Ações</th>
+                  <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10 text-xs">
+                    <th className="px-md py-md font-semibold">Nome</th>
+                    <th className="px-md py-md font-semibold">Data</th>
+                    <th className="px-md py-md font-semibold">Serviço</th>
+                    <th className="px-md py-md font-semibold">Descrição</th>
+                    <th className="px-md py-md font-semibold">Categoria</th>
+                    <th className="px-md py-md font-semibold text-center">Comprovante</th>
+                    <th className="px-md py-md font-semibold">Valor</th>
+                    <th className="px-md py-md text-right font-semibold">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="text-body-md divide-y divide-outline-variant/20">
                   {extrato.map((row, index) => (
-                    <tr key={`${row.servico}-${row.data}-${index}`} className="hover:bg-primary-fixed/5 transition-all">
-                      <td className="px-lg py-lg font-bold text-on-surface">{row.nome}</td>
-                      <td className="px-lg py-lg text-on-surface-variant font-mono-data text-xs">{formatDate(row.data)}</td>
-                      <td className="px-lg py-lg text-on-surface-variant font-medium">{row.servico}</td>
-                      <td className="px-lg py-lg">
+                    <tr key={`${row.servico}-${row.data}-${index}`} className="hover:bg-primary-fixed/5 transition-all text-sm">
+                      <td className="px-md py-md font-bold text-on-surface">{row.nome}</td>
+                      <td className="px-md py-md text-on-surface-variant font-mono-data text-xs">{formatDate(row.data)}</td>
+                      <td className="px-md py-md text-on-surface-variant font-medium text-xs">{row.servico}</td>
+                      <td className="px-md py-md text-on-surface-variant text-xs max-w-[150px] truncate" title={row.observacao || ''}>
+                        {row.observacao || <span className="opacity-40 italic text-[11px]">Sem descrição</span>}
+                      </td>
+                      <td className="px-md py-md">
                         <span className={`px-sm py-[2px] rounded-lg border font-label-sm uppercase text-[9px] font-bold ${
                           row.tipo_pagamento === 'MENSAL' ? 'border-primary/20 bg-primary/10 text-primary' : 'border-secondary/20 bg-secondary/10 text-secondary'
                         }`}>
                           {row.tipo_pagamento === 'MENSAL' ? 'Mensalidade' : 'Avulso'}
                         </span>
                       </td>
-                      <td className="px-lg py-lg text-primary font-mono-data font-semibold">{formatCurrency(row.valor)}</td>
-                      <td className="px-lg py-lg text-right">
-                        <button
-                          type="button"
-                          onClick={() => void onDeletePagamento(row.id)}
-                          className="material-symbols-outlined text-outline hover:text-error transition-all text-[20px]"
-                          title="Excluir lançamento"
-                        >
-                          delete
-                        </button>
+                      <td className="px-md py-md text-center">
+                        {row.comprovante_base64 ? (
+                          <button
+                            type="button"
+                            onClick={() => setActiveReceipt(row.comprovante_base64 || null)}
+                            className="inline-flex w-7 h-7 rounded-lg bg-primary/10 border border-primary/20 hover:bg-primary/20 items-center justify-center text-primary transition-all active:scale-90"
+                            title="Ver comprovante anexado"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
+                          </button>
+                        ) : (
+                          <span className="opacity-30 italic text-[10px]">Nenhum</span>
+                        )}
+                      </td>
+                      <td className="px-md py-md text-primary font-mono-data font-semibold text-xs">{formatCurrency(row.valor)}</td>
+                      <td className="px-md py-md text-right">
+                        <div className="flex gap-sm justify-end">
+                          <button
+                            type="button"
+                            onClick={() => handleStartEditPagamento(row)}
+                            className="material-symbols-outlined text-outline hover:text-primary transition-all text-[18px]"
+                            title="Editar lançamento"
+                          >
+                            edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void onDeletePagamento(row.id)}
+                            className="material-symbols-outlined text-outline hover:text-error transition-all text-[18px]"
+                            title="Excluir lançamento"
+                          >
+                            delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                   {extrato.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="text-center py-lg text-secondary">
+                      <td colSpan={8} className="text-center py-lg text-secondary">
                         Nenhum faturamento registrado para este cliente.
                       </td>
                     </tr>
@@ -437,6 +644,242 @@ export function ClienteDetailPage() {
 
       </div>
 
+      {/* Receipt Modal Preview */}
+      {activeReceipt && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(28, 38, 30, 0.6)',
+            backdropFilter: 'blur(8px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 99999,
+          }}
+          onClick={() => setActiveReceipt(null)}
+        >
+          <div 
+            className="bg-white p-lg rounded-2xl shadow-2xl max-w-2xl w-full mx-md overflow-hidden relative border border-outline-variant/30"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-md pb-xs border-b border-outline/10">
+              <h3 className="text-lg font-bold text-primary flex items-center gap-xs">
+                <span className="material-symbols-outlined">receipt_long</span>
+                Comprovante de Pagamento
+              </h3>
+              <button 
+                onClick={() => setActiveReceipt(null)}
+                className="w-8 h-8 rounded-full bg-surface-container-high hover:bg-surface-variant flex items-center justify-center transition-all"
+              >
+                <span className="material-symbols-outlined text-outline text-lg">close</span>
+              </button>
+            </div>
+            <div className="flex justify-center bg-surface-container-lowest rounded-xl p-sm max-h-[60vh] overflow-y-auto border border-outline/5">
+              <img 
+                src={activeReceipt} 
+                alt="Comprovante de Pagamento" 
+                className="max-w-full h-auto object-contain rounded-lg shadow-sm"
+              />
+            </div>
+            <div className="mt-md flex justify-end gap-sm">
+              <a 
+                href={activeReceipt} 
+                download="comprovante_pagamento.png" 
+                className="px-md py-sm bg-primary text-on-primary rounded-xl font-bold text-sm flex items-center gap-xs hover:brightness-110 active:scale-95 transition-all shadow-md"
+              >
+                <span className="material-symbols-outlined text-sm">download</span>
+                Baixar
+              </a>
+              <button 
+                onClick={() => setActiveReceipt(null)}
+                className="px-md py-sm bg-surface-container-high rounded-xl text-outline font-bold text-sm"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal Configurar Recorrência Mensal */}
+      {recorrenciaModalProjeto && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(28, 38, 30, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 99999,
+          }}
+        >
+          <div className="card bg-white p-lg rounded-xl shadow-2xl border border-outline-variant/30" style={{ width: 'min(420px, 94vw)' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', fontFamily: 'var(--font-heading)' }} className="text-primary">
+              Ativar Recorrência Mensal
+            </h3>
+            <p className="text-sm text-outline mb-md">
+              Configura o serviço <span className="font-bold text-primary">{recorrenciaModalProjeto.servico_nome}</span> para gerar cobranças recorrentes automáticas mensais.
+            </p>
+
+            <form className="space-y-md" onSubmit={onAtivarRecorrenciaSubmit}>
+              <label className="block text-sm font-semibold text-outline">
+                Valor da Mensalidade (R$)
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="Ex: 1200.00"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={recorrenciaForm.valor_mensal}
+                  onChange={(e) => setRecorrenciaForm((prev) => ({ ...prev, valor_mensal: e.target.value }))}
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Dia de Vencimento Mensal (1 a 28)
+                <input
+                  required
+                  type="number"
+                  min="1"
+                  max="28"
+                  placeholder="5"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={recorrenciaForm.dia_vencimento}
+                  onChange={(e) => setRecorrenciaForm((prev) => ({ ...prev, dia_vencimento: e.target.value }))}
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="px-md py-sm bg-surface-container-high rounded-xl text-outline font-bold text-sm"
+                  onClick={() => setRecorrenciaModalProjeto(null)}
+                >
+                  Cancelar
+                </button>
+                <button className="px-md py-sm bg-primary text-on-primary rounded-xl font-bold text-sm shadow-md" type="submit">
+                  Ativar Recorrência
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Lançamento */}
+      {editingPagamento && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(28, 38, 30, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 99999,
+          }}
+        >
+          <div className="card bg-white p-lg rounded-xl shadow-2xl border border-outline-variant/30" style={{ width: 'min(460px, 94vw)' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', fontFamily: 'var(--font-heading)' }} className="text-primary">
+              Editar Lançamento Financeiro
+            </h3>
+
+            <form className="space-y-md" onSubmit={onUpdatePagamentoSubmit}>
+              <label className="block text-sm font-semibold text-outline">
+                Serviço Referente
+                <select
+                  value={editingPagamento.projeto_id}
+                  onChange={(e) =>
+                    setEditingPagamento((prev) => prev ? ({ ...prev, projeto_id: Number(e.target.value) }) : null)
+                  }
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                >
+                  {projetos.map((projeto) => (
+                    <option key={projeto.id} value={projeto.id}>
+                      {projeto.servico_nome}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Valor do Lançamento (R$)
+                <input
+                  required
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={editingPagamento.valor}
+                  onChange={(e) =>
+                    setEditingPagamento((prev) => prev ? ({ ...prev, valor: e.target.value }) : null)
+                  }
+                />
+              </label>
+
+              {/* Type is kept as originally registered */}
+
+              <label className="block text-sm font-semibold text-outline">
+                Data
+                <input
+                  required
+                  type="date"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface font-mono-data"
+                  value={editingPagamento.data}
+                  onChange={(e) =>
+                    setEditingPagamento((prev) => prev ? ({ ...prev, data: e.target.value }) : null)
+                  }
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Descrição / Memorando
+                <input
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={editingPagamento.observacao}
+                  onChange={(e) =>
+                    setEditingPagamento((prev) => prev ? ({ ...prev, observacao: e.target.value }) : null)
+                  }
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Alterar Comprovante (Imagem)
+                <input
+                  key={editFileKey}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleEditFileChange}
+                  className="mt-1 w-full text-xs text-on-surface file:mr-md file:py-xs file:px-sm file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 cursor-pointer"
+                />
+              </label>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="px-md py-sm bg-surface-container-high rounded-xl text-outline font-bold text-sm"
+                  onClick={() => setEditingPagamento(null)}
+                >
+                  Cancelar
+                </button>
+                <button className="px-md py-sm bg-primary text-on-primary rounded-xl font-bold text-sm shadow-md" type="submit">
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

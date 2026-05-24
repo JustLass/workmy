@@ -35,7 +35,7 @@ class PagamentoFilterSchema(Schema):
     projeto_id: Optional[int] = Field(None, description="Filtrar por ID do projeto")
     tipo_pagamento: Optional[str] = Field(
         None,
-        description="Tipo (MENSAL, QUINZENAL, AVULSO)"
+        description="Tipo (MENSAL, AVULSO)"
     )
     data_inicio: Optional[date] = Field(None, description="Data inicial (inclusive)")
     data_fim: Optional[date] = Field(None, description="Data final (inclusive)")

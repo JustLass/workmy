@@ -23,8 +23,6 @@ export function ProjetosPage() {
     servico_id: '',
     status: 'DISCOVERY' as StatusType,
     progresso: 0,
-    data_entrega: '',
-    valor: '',
     tipo_recorrencia: 'AVULSO',
     ativo: true,
   })
@@ -34,8 +32,6 @@ export function ProjetosPage() {
   const [editForm, setEditForm] = useState({
     status: 'DISCOVERY' as StatusType,
     progresso: 0,
-    data_entrega: '',
-    valor: '',
     tipo_recorrencia: 'AVULSO',
     ativo: true,
   })
@@ -72,8 +68,6 @@ export function ProjetosPage() {
           servico_id: Number(form.servico_id),
           status: form.status,
           progresso: Number(form.progresso),
-          data_entrega: form.data_entrega || null,
-          valor: form.valor ? Number(form.valor) : null,
           tipo_recorrencia: form.tipo_recorrencia,
           ativo: form.ativo,
         },
@@ -83,8 +77,6 @@ export function ProjetosPage() {
         servico_id: '',
         status: 'DISCOVERY',
         progresso: 0,
-        data_entrega: '',
-        valor: '',
         tipo_recorrencia: 'AVULSO',
         ativo: true,
       })
@@ -128,8 +120,6 @@ export function ProjetosPage() {
     setEditForm({
       status: item.status,
       progresso: item.progresso,
-      data_entrega: item.data_entrega || '',
-      valor: item.valor || '',
       tipo_recorrencia: item.tipo_recorrencia,
       ativo: item.ativo,
     })
@@ -148,8 +138,6 @@ export function ProjetosPage() {
           servico_id: editingItem.servico_id,
           status: editForm.status,
           progresso: Number(editForm.progresso),
-          data_entrega: editForm.data_entrega || null,
-          valor: editForm.valor ? Number(editForm.valor) : null,
           tipo_recorrencia: editForm.tipo_recorrencia,
           ativo: editForm.ativo,
         },
@@ -178,8 +166,6 @@ export function ProjetosPage() {
           servico_id: item.servico_id,
           status: item.status,
           progresso: item.progresso,
-          data_entrega: item.data_entrega || null,
-          valor: item.valor ? Number(item.valor) : null,
           tipo_recorrencia: item.tipo_recorrencia,
           ativo: newAtivo,
         },
@@ -213,10 +199,9 @@ export function ProjetosPage() {
       return <span className="px-xs py-[2px] text-[10px] font-bold uppercase tracking-widest text-on-surface-variant bg-surface-container-high rounded">Avulso</span>
     }
     const color = item.ativo ? 'text-on-secondary-container bg-secondary-container' : 'text-on-surface-variant bg-surface-container-high'
-    const label = item.tipo_recorrencia === 'MENSAL' ? 'Mensal' : 'Quinzenal'
     return (
       <span className={`px-xs py-[2px] text-[10px] font-bold uppercase tracking-widest ${color} rounded`}>
-        {label} {item.ativo ? 'Ativa' : 'Pausada'}
+        Mensal {item.ativo ? 'Ativa' : 'Pausada'}
       </span>
     )
   }
@@ -239,7 +224,7 @@ export function ProjetosPage() {
             className="bg-primary text-on-primary font-bold py-sm px-md rounded-xl flex items-center justify-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-lg"
           >
             <span className="material-symbols-outlined">add_circle</span>
-            Novo Projeto
+            Novo Contrato
           </button>
         </div>
       </section>
@@ -250,7 +235,7 @@ export function ProjetosPage() {
         <article className="card bg-white p-lg rounded-xl shadow-md border border-outline/20">
           <EmptyState
             title="Nenhum projeto cadastrado"
-            description="Crie seu primeiro projeto clicando no botão Novo Projeto."
+            description="Crie seu primeiro projeto clicando no botão Novo Contrato."
           />
         </article>
       ) : (
@@ -259,14 +244,12 @@ export function ProjetosPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10">
+                <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10 text-xs">
                   <th className="px-lg py-md font-semibold">Projeto / Serviço</th>
                   <th className="px-lg py-md font-semibold">Cliente</th>
-                  <th className="px-lg py-md font-semibold">Valor do Contrato</th>
+                  <th className="px-lg py-md font-semibold">Total Recebido</th>
                   <th className="px-lg py-md font-semibold">Status</th>
-                  <th className="px-lg py-md font-semibold">Progresso</th>
                   <th className="px-lg py-md font-semibold">Recorrência</th>
-                  <th className="px-lg py-md font-semibold">Data Limite</th>
                   <th className="px-lg py-md font-semibold text-right">Ações</th>
                 </tr>
               </thead>
@@ -289,7 +272,7 @@ export function ProjetosPage() {
                       {item.cliente_nome}
                     </td>
                     <td className="px-lg py-lg text-primary font-mono-data font-semibold">
-                      {formatMoney(item.valor)}
+                      {formatMoney(item.total_acumulado)}
                     </td>
                     <td className="px-lg py-lg">
                       <select
@@ -303,60 +286,6 @@ export function ProjetosPage() {
                         <option value="COMPLETED">Concluído</option>
                       </select>
                     </td>
-                    <td className="px-lg py-lg w-48">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex justify-between items-center text-xs text-on-surface-variant">
-                          <div className="flex gap-1 items-center">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newProg = Math.max(0, item.progresso - 10)
-                                void request(`/projetos/${item.id}`, {
-                                  method: 'PUT',
-                                  body: {
-                                    cliente_id: item.cliente_id,
-                                    servico_id: item.servico_id,
-                                    status: item.status,
-                                    progresso: newProg,
-                                    data_entrega: item.data_entrega || null,
-                                    valor: item.valor ? Number(item.valor) : null,
-                                    tipo_recorrencia: item.tipo_recorrencia,
-                                    ativo: item.ativo,
-                                  }
-                                }).then(() => load())
-                              }}
-                              className="w-4 h-4 rounded bg-surface-container-high hover:bg-surface-variant text-[10px] font-extrabold flex items-center justify-center select-none"
-                              title="Reduzir 10%"
-                            >-</button>
-                            <span className="font-bold">{item.progresso}%</span>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newProg = Math.min(100, item.progresso + 10)
-                                void request(`/projetos/${item.id}`, {
-                                  method: 'PUT',
-                                  body: {
-                                    cliente_id: item.cliente_id,
-                                    servico_id: item.servico_id,
-                                    status: item.status,
-                                    progresso: newProg,
-                                    data_entrega: item.data_entrega || null,
-                                    valor: item.valor ? Number(item.valor) : null,
-                                    tipo_recorrencia: item.tipo_recorrencia,
-                                    ativo: item.ativo,
-                                  }
-                                }).then(() => load())
-                              }}
-                              className="w-4 h-4 rounded bg-surface-container-high hover:bg-surface-variant text-[10px] font-extrabold flex items-center justify-center select-none"
-                              title="Aumentar 10%"
-                            >+</button>
-                          </div>
-                        </div>
-                        <div className="w-full bg-surface-container-high h-1.5 rounded-full overflow-hidden">
-                          <div className="bg-primary h-full rounded-full transition-all duration-300" style={{ width: `${item.progresso}%` }}></div>
-                        </div>
-                      </div>
-                    </td>
                     <td className="px-lg py-lg">
                       <div
                         onClick={() => toggleRecurrence(item)}
@@ -365,9 +294,6 @@ export function ProjetosPage() {
                       >
                         {getRecurrenceBadge(item)}
                       </div>
-                    </td>
-                    <td className="px-lg py-lg text-on-surface-variant font-mono-data text-xs">
-                      {item.data_entrega ? new Date(item.data_entrega + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Sem prazo'}
                     </td>
                     <td className="px-lg py-lg text-right font-medium">
                       <div className="flex gap-md justify-end items-center">
@@ -451,48 +377,20 @@ export function ProjetosPage() {
                 </select>
               </label>
 
-              <label className="block text-sm font-semibold text-outline">
-                Valor Total do Orçamento (Opcional)
-                <input
-                  type="number"
-                  placeholder="Ex: 5000"
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                  value={form.valor}
-                  onChange={(e) => setForm((prev) => ({ ...prev, valor: e.target.value }))}
-                />
-              </label>
-
-              <label className="block text-sm font-semibold text-outline">
-                Data Limite de Entrega (Opcional)
-                <input
-                  type="date"
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                  value={form.data_entrega}
-                  onChange={(e) => setForm((prev) => ({ ...prev, data_entrega: e.target.value }))}
-                />
-              </label>
-
-              <label className="block text-sm font-semibold text-outline">
-                Ciclo de Recorrência
-                <select
-                  value={form.tipo_recorrencia}
-                  onChange={(e) => setForm((prev) => ({ ...prev, tipo_recorrencia: e.target.value }))}
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                >
-                  <option value="AVULSO">Pagamento Único (Avulso)</option>
-                  <option value="MENSAL">Cobrança Recorrente Mensal</option>
-                  <option value="QUINZENAL">Cobrança Recorrente Quinzenal</option>
-                </select>
-              </label>
-
-              <label className="flex items-center gap-xs font-semibold text-outline cursor-pointer mt-sm">
+              <label className="flex items-center gap-xs font-semibold text-outline cursor-pointer mt-md select-none">
                 <input
                   type="checkbox"
-                  checked={form.ativo}
-                  onChange={(e) => setForm((prev) => ({ ...prev, ativo: e.target.checked }))}
+                  checked={form.tipo_recorrencia === 'MENSAL'}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      tipo_recorrencia: e.target.checked ? 'MENSAL' : 'AVULSO',
+                      ativo: e.target.checked,
+                    }))
+                  }
                   className="rounded border-outline/20 text-primary focus:ring-primary w-5 h-5"
                 />
-                Recorrência Ativa
+                Cobrança Recorrente Mensal
               </label>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
@@ -551,60 +449,20 @@ export function ProjetosPage() {
                 </select>
               </label>
 
-              <label className="block text-sm font-semibold text-outline">
-                Progresso ({editForm.progresso}%)
-                <input
-                  type="range"
-                  min="0"
-                  max="100"
-                  value={editForm.progresso}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, progresso: Number(e.target.value) }))}
-                  className="w-full mt-2 h-2 bg-surface-container-high rounded-full appearance-none cursor-pointer accent-primary"
-                />
-              </label>
-
-              <label className="block text-sm font-semibold text-outline">
-                Valor Total do Orçamento
-                <input
-                  type="number"
-                  placeholder="Ex: 5000"
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                  value={editForm.valor}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, valor: e.target.value }))}
-                />
-              </label>
-
-              <label className="block text-sm font-semibold text-outline">
-                Prazo de Entrega
-                <input
-                  type="date"
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                  value={editForm.data_entrega}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, data_entrega: e.target.value }))}
-                />
-              </label>
-
-              <label className="block text-sm font-semibold text-outline">
-                Ciclo de Recorrência
-                <select
-                  value={editForm.tipo_recorrencia}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, tipo_recorrencia: e.target.value }))}
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                >
-                  <option value="AVULSO">Pagamento Único (Avulso)</option>
-                  <option value="MENSAL">Cobrança Recorrente Mensal</option>
-                  <option value="QUINZENAL">Cobrança Recorrente Quinzenal</option>
-                </select>
-              </label>
-
-              <label className="flex items-center gap-xs font-semibold text-outline cursor-pointer mt-sm">
+              <label className="flex items-center gap-xs font-semibold text-outline cursor-pointer mt-md select-none">
                 <input
                   type="checkbox"
-                  checked={editForm.ativo}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, ativo: e.target.checked }))}
+                  checked={editForm.tipo_recorrencia === 'MENSAL'}
+                  onChange={(e) =>
+                    setEditForm((prev) => ({
+                      ...prev,
+                      tipo_recorrencia: e.target.checked ? 'MENSAL' : 'AVULSO',
+                      ativo: e.target.checked,
+                    }))
+                  }
                   className="rounded border-outline/20 text-primary focus:ring-primary w-5 h-5"
                 />
-                Recorrência Ativa
+                Cobrança Recorrente Mensal
               </label>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>

@@ -1,10 +1,15 @@
 """Serialização de Projeto para respostas da API."""
+from django.db.models import Sum
+from decimal import Decimal
 from gestao_freelas.models import Projeto
 
 
 def projeto_to_dict(projeto: Projeto) -> dict:
-    from gestao_freelas.services.recorrencia import obter_ou_criar_ativo
-    ativo_info = obter_ou_criar_ativo(projeto)
+    # Calcula a soma dos pagamentos reais vinculados a este projeto específico
+    total = projeto.pagamentos.filter(deletado_em__isnull=True).aggregate(total=Sum('valor'))['total']
+    if total is None:
+        total = Decimal('0.00')
+        
     return {
         'id': projeto.id,
         'cliente_id': projeto.cliente_id,
@@ -16,12 +21,9 @@ def projeto_to_dict(projeto: Projeto) -> dict:
         'dia_vencimento': projeto.dia_vencimento,
         'recorrencia_inicio': projeto.recorrencia_inicio.isoformat() if projeto.recorrencia_inicio else None,
         'criado_em': projeto.criado_em.isoformat(),
-        # Novos campos
         'status': projeto.status,
         'progresso': projeto.progresso,
-        'data_entrega': projeto.data_entrega.isoformat() if projeto.data_entrega else None,
-        'valor': str(projeto.valor) if projeto.valor is not None else None,
-        'tipo_recorrencia': ativo_info.tipo_recorrencia,
-        'ativo': ativo_info.ativo,
+        'tipo_recorrencia': projeto.tipo_recorrencia,
+        'ativo': projeto.recorrencia_ativa,
+        'total_acumulado': f"{total:.2f}",
     }
-

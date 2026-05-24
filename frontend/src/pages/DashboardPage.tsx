@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useResourceQuery } from '../hooks/useResourceQuery'
 import type { DashboardMensal, Pagamento, Projeto } from '../types'
 import { InteractiveLineChart } from '../components/InteractiveCharts'
@@ -17,6 +18,8 @@ export function DashboardPage() {
     watchScopes: ['/dashboard/mensal', '/pagamentos/', '/projetos/'],
   })
 
+  const [activitySearch, setActivitySearch] = useState('')
+
   // Formatting utils
   const formatMoney = (val: string | number | null | undefined) => {
     if (!val) return 'R$ 0,00'
@@ -29,11 +32,7 @@ export function DashboardPage() {
   const activeCount = projetos.length
   const pendingRevenue = dataFinanceiro ? Number(dataFinanceiro.previsto_proximo_mes) : 0
 
-  // Calculate project completion percent
-  const completedCount = projetos.filter(p => p.status === 'COMPLETED').length
-  const completionPercent = projetos.length
-    ? Math.round((completedCount / projetos.length) * 100)
-    : 0
+
 
   // Dynamically calculate actual payments over the last 6 months
   const MONTH_NAMES = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
@@ -107,6 +106,19 @@ export function DashboardPage() {
     return new Date().toLocaleDateString('pt-BR', options)
   }
 
+  // Filter activity feed dynamically
+  const filteredPagamentos = pagamentos.filter((p) => {
+    if (!activitySearch.trim()) return true
+    const term = activitySearch.toLowerCase()
+    return (
+      (p.projeto_cliente_nome || '').toLowerCase().includes(term) ||
+      (p.projeto_servico_nome || '').toLowerCase().includes(term) ||
+      (p.tipo_pagamento_display || p.tipo_pagamento || '').toLowerCase().includes(term) ||
+      (p.valor || '').includes(term) ||
+      (p.observacao || '').toLowerCase().includes(term)
+    )
+  })
+
   return (
     <div className="font-body-md text-body-md selection:bg-primary-fixed">
       {/* Header Section */}
@@ -149,14 +161,9 @@ export function DashboardPage() {
             <div>
               <p className="text-label-sm uppercase tracking-widest text-secondary font-bold mb-md">Projetos Ativos</p>
               <h3 className="font-display-lg text-4xl text-primary mb-xs">{activeCount}</h3>
-              <p className="text-on-surface-variant text-label-sm">{completedCount} Concluídos</p>
             </div>
-            <div className="relative h-20 w-20 flex items-center justify-center">
-              <svg className="h-full w-full transform -rotate-90">
-                <circle className="text-surface-container-high" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" strokeWidth="4"></circle>
-                <circle className="text-primary" cx="40" cy="40" fill="transparent" r="34" stroke="currentColor" strokeDasharray="213.6" strokeDashoffset={213.6 - (213.6 * completionPercent) / 100} strokeWidth="6"></circle>
-              </svg>
-              <span className="absolute font-mono-data text-primary text-sm font-bold">{completionPercent}%</span>
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-primary shrink-0">
+              <span className="material-symbols-outlined text-[32px]">task_alt</span>
             </div>
           </div>
         </div>
@@ -194,12 +201,21 @@ export function DashboardPage() {
 
         {/* Recent Activity Feed */}
         <div className="col-span-12 lg:col-span-4 glass-panel rounded-xl p-lg flex flex-col soft-shadow-green bg-surface-container-lowest">
-          <div className="flex justify-between items-center mb-lg">
+          <div className="flex flex-col gap-sm mb-lg border-b border-outline/5 pb-md">
             <h4 className="font-headline-md text-on-surface text-lg font-bold">Atividades Recentes</h4>
-            <span className="material-symbols-outlined text-outline">more_vert</span>
+            <div className="relative mt-1">
+              <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline/60 text-[16px]">search</span>
+              <input
+                type="text"
+                placeholder="Pesquisar faturamentos..."
+                value={activitySearch}
+                onChange={(e) => setActivitySearch(e.target.value)}
+                className="w-full bg-surface-container-low border border-outline/10 rounded-xl py-xs pl-8 pr-sm text-xs focus:outline-none focus:border-primary text-on-surface placeholder:text-outline/55"
+              />
+            </div>
           </div>
           <div className="space-y-lg flex-1">
-            {pagamentos.slice(0, 4).map((p) => (
+            {filteredPagamentos.slice(0, 4).map((p) => (
               <div className="flex gap-md" key={p.id}>
                 <div className="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center shrink-0">
                   <span className="material-symbols-outlined text-on-secondary-container text-sm">check_circle</span>
@@ -210,18 +226,18 @@ export function DashboardPage() {
                 </div>
               </div>
             ))}
-            {pagamentos.length === 0 && (
+            {filteredPagamentos.length === 0 && (
               <div className="text-center py-xl text-secondary">
-                Nenhum pagamento registrado recentemente.
+                Nenhuma atividade correspondente encontrada.
               </div>
             )}
           </div>
         </div>
 
-        {/* Upcoming Deadlines Table */}
+        {/* Recent Projects Table */}
         <div className="col-span-12 glass-panel rounded-xl overflow-hidden soft-shadow-green bg-surface-container-lowest">
           <div className="px-lg py-md flex justify-between items-center border-b border-outline-variant/20">
-            <h4 className="font-headline-md text-on-surface text-lg font-bold">Próximos Prazos de Entrega</h4>
+            <h4 className="font-headline-md text-on-surface text-lg font-bold">Projetos Recentes</h4>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
@@ -229,7 +245,7 @@ export function DashboardPage() {
                 <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold">
                   <th className="px-lg py-md font-semibold">Nome do Projeto</th>
                   <th className="px-lg py-md font-semibold">Cliente</th>
-                  <th className="px-lg py-md font-semibold">Data Limite</th>
+                  <th className="px-lg py-md font-semibold">Progresso</th>
                   <th className="px-lg py-md font-semibold">Status</th>
                 </tr>
               </thead>
@@ -243,10 +259,8 @@ export function DashboardPage() {
                       </div>
                     </td>
                     <td className="px-lg py-lg text-on-surface-variant">{proj.cliente_nome}</td>
-                    <td className="px-lg py-lg">
-                      <span className="font-mono-data text-error font-bold">
-                        {proj.data_entrega ? new Date(proj.data_entrega + 'T12:00:00').toLocaleDateString('pt-BR', { month: 'short', day: '2-digit', year: 'numeric' }) : 'Sem prazo definido'}
-                      </span>
+                    <td className="px-lg py-lg text-primary font-mono-data font-bold">
+                      {proj.progresso}%
                     </td>
                     <td className="px-lg py-lg">
                       <span className="px-sm py-xs rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase">
@@ -258,7 +272,7 @@ export function DashboardPage() {
                 {projetos.length === 0 && (
                   <tr>
                     <td colSpan={4} className="text-center py-lg text-secondary">
-                      Nenhum projeto ativo com prazos de entrega.
+                      Nenhum projeto ativo cadastrado.
                     </td>
                   </tr>
                 )}
