@@ -52,8 +52,19 @@ function loadState(): CacheState {
 
 function saveState(state: CacheState) {
   if (!canUseStorage()) return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  } catch (error) {
+    console.warn('[WorkMy] Falha ao gravar cache no localStorage (excedeu cota?):', error)
+    // Tenta limpar o cache para recuperar espaço
+    try {
+      localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      // Ignora erro ao remover
+    }
+  }
 }
+
 
 function normalizePath(path: string) {
   if (!path) return '/'

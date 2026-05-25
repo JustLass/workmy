@@ -6,15 +6,15 @@ class ClienteAdmin(admin.ModelAdmin):
     """
     Interface administrativa para gerenciar Clientes.
     """
-    list_display = ['nome', 'email', 'telefone', 'usuario', 'criado_em']
+    list_display = ['nome', 'empresa', 'email', 'telefone', 'usuario', 'criado_em']
     list_filter = ['criado_em', 'usuario']
-    search_fields = ['nome', 'email', 'telefone']
+    search_fields = ['nome', 'empresa', 'email', 'telefone']
     ordering = ['-criado_em']
     date_hierarchy = 'criado_em'
     
     fieldsets = (
         ('Informações do Cliente', {
-            'fields': ('nome', 'email', 'telefone')
+            'fields': ('nome', 'empresa', 'email', 'telefone')
         }),
         ('Relacionamento', {
             'fields': ('usuario',)

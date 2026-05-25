@@ -153,7 +153,7 @@ export function AppLayout() {
 
       {/* TopNavBar Shell */}
       <header className="fixed top-0 right-0 w-full lg:w-[calc(100%-16rem)] h-16 bg-surface/70 backdrop-blur-xl border-b border-outline-variant/30 z-40 flex justify-between items-center px-4 lg:px-8">
-        <div className="flex items-center w-2/3 lg:w-1/3">
+        <div className="flex items-center">
           <button
             onClick={() => setIsSidebarOpen(true)}
             className="lg:hidden p-2 -ml-2 mr-2 rounded-xl text-primary hover:bg-primary-fixed/20 flex items-center justify-center shrink-0"
@@ -161,14 +161,6 @@ export function AppLayout() {
           >
             <span className="material-symbols-outlined text-headline-md">menu</span>
           </button>
-          <div className="relative w-full group">
-            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-            <input
-              className="w-full bg-surface-container-low border border-outline-variant/20 rounded-full py-sm pl-11 pr-md font-body-md focus:outline-none focus:border-primary transition-all text-on-surface placeholder:text-on-surface-variant"
-              placeholder="Buscar..."
-              type="text"
-            />
-          </div>
         </div>
         <div className="flex items-center gap-md lg:gap-lg">
           <div className="flex items-center gap-md group">

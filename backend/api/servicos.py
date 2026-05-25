@@ -1,6 +1,7 @@
 """
 Router CRUD para Serviços
 """
+from django.http import HttpResponse
 from ninja import Router, Form
 from typing import List
 from django.db.models import Sum, Value, DecimalField
@@ -8,9 +9,17 @@ from django.db.models.functions import Coalesce
 from gestao_freelas.models import Servico, Projeto, Cliente
 from api.projeto_serializers import projeto_to_dict
 from api.servico_serializers import servico_to_dict, parse_base64_data_url
-from api.schemas import ServicoInSchema, ServicoOutSchema, ServicoDetailOutSchema, ErrorSchema, MessageSchema
+from api.schemas import (
+    ServicoInSchema,
+    ServicoOutSchema,
+    ServicoDetailOutSchema,
+    VincularClientesMassaInSchema,
+    ErrorSchema,
+    MessageSchema,
+)
 from api.cache import get_cached_response, set_cached_response, invalidate_user_cache
 from api.auth import AuthBearer
+from api.pdf_generator import generate_commercial_pdf
 
 router = Router(tags=["Serviços"], auth=AuthBearer())
 
@@ -191,3 +200,76 @@ def delete_servico(request, servico_id: int):
     servico.delete()
     invalidate_user_cache(request.auth.id)
     return 200, {"message": f"Serviço '{nome}' deletado com sucesso"}
+
+
+@router.post("/{servico_id}/vincular-clientes-massa", response={200: MessageSchema, 404: ErrorSchema, 400: ErrorSchema}, summary="Vincular múltiplos clientes em massa a um serviço")
+def vincular_clientes_massa(request, servico_id: int, payload: VincularClientesMassaInSchema):
+    """
+    Vincula múltiplos clientes de uma só vez a um serviço.
+    Se o cliente já possuir o serviço ativo, ele é ignorado silenciosamente seguindo a regra de unicidade.
+    """
+    try:
+        servico = Servico.objects.get(id=servico_id, usuario=request.auth)
+    except Servico.DoesNotExist:
+        return 404, {"detail": "Serviço não encontrado"}
+    
+    clientes_adicionados = 0
+    clientes_ignorados = 0
+    
+    for cid in payload.cliente_ids:
+        try:
+            cliente = Cliente.objects.get(id=cid, usuario=request.auth)
+        except Cliente.DoesNotExist:
+            clientes_ignorados += 1
+            continue
+            
+        # Verifica se já está acoplado
+        if Projeto.objects.filter(cliente=cliente, servico=servico, deletado_em__isnull=True).exists():
+            clientes_ignorados += 1
+            continue
+        
+        # Cria o projeto (contrato)
+        tipo_rec = payload.tipo_recorrencia.upper() if payload.tipo_recorrencia else "AVULSO"
+        if tipo_rec not in ("MENSAL", "AVULSO"):
+            tipo_rec = "AVULSO"
+            
+        # Define se é mensalista
+        mensalista = (tipo_rec == "MENSAL")
+        
+        Projeto.objects.create(
+            usuario=request.auth,
+            cliente=cliente,
+            servico=servico,
+            tipo_recorrencia=tipo_rec,
+            mensalista=mensalista,
+            valor=payload.valor,
+            valor_mensal=payload.valor if mensalista else None,
+            dia_vencimento=payload.dia_vencimento
+        )
+        clientes_adicionados += 1
+        
+    invalidate_user_cache(request.auth.id)
+    return 200, {
+        "message": f"{clientes_adicionados} cliente(s) vinculado(s) com sucesso. {clientes_ignorados} ignorado(s) por já possuírem o serviço ou serem inválidos."
+    }
+
+
+@router.get("/{servico_id}/pdf", summary="Exportar PDF comercial do serviço")
+def exportar_servico_pdf(request, servico_id: int):
+    """
+    Gera e retorna um PDF de portfólio comercial premium do serviço.
+    """
+    try:
+        servico = Servico.objects.get(id=servico_id, usuario=request.auth)
+    except Servico.DoesNotExist:
+        return 404, {"detail": "Serviço não encontrado"}
+
+    pdf_bytes = generate_commercial_pdf(servico, request.auth)
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    # Nome limpo do arquivo PDF
+    safe_name = "".join(c for c in servico.nome if c.isalnum() or c in (" ", "_", "-")).rstrip()
+    safe_name = safe_name.replace(" ", "_")
+    response['Content-Disposition'] = f'attachment; filename="Portfolio_{safe_name}.pdf"'
+    return response
+

@@ -427,7 +427,6 @@ export function PagamentosPage() {
               <label className="block text-sm font-semibold text-outline">
                 Observações / Memorando
                 <input
-                  placeholder="Ex: Faturamento referente à entrega da etapa 2..."
                   className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
                   value={form.observacao}
                   onChange={(e) => setForm((prev) => ({ ...prev, observacao: e.target.value }))}

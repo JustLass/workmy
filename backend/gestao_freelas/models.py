@@ -11,6 +11,7 @@ class Cliente(models.Model):
     usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='clientes')
     
     nome = models.CharField(max_length=100)
+    empresa = models.CharField(max_length=100, default='Não informada', blank=True)
     email = models.EmailField(max_length=254, blank=True, null=True)
     telefone = models.CharField(max_length=20, blank=True, null=True)
     
@@ -127,6 +128,13 @@ class Projeto(models.Model):
     deletado_em = models.DateTimeField(null=True, blank=True, help_text='Data de soft delete')
     
     class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cliente', 'servico'],
+                condition=models.Q(deletado_em__isnull=True),
+                name='uniq_projeto_cliente_servico_ativo',
+            )
+        ]
         indexes = [
             models.Index(fields=['usuario', 'status'], name='projeto_usuario_status_idx'),
             models.Index(fields=['usuario', 'criado_em'], name='projeto_usuario_criado_idx'),
@@ -139,6 +147,17 @@ class Projeto(models.Model):
             raise ValidationError({'valor': 'Valor deve ser maior que zero'})
         if not (0 <= self.progresso <= 100):
             raise ValidationError({'progresso': 'Progresso deve estar entre 0 e 100'})
+            
+        # Regra de negócio: Um cliente não pode ter o mesmo serviço ativo contratado mais de uma vez
+        projetos_ativos = Projeto.objects.filter(
+            cliente=self.cliente,
+            servico=self.servico,
+            deletado_em__isnull=True
+        )
+        if self.pk:
+            projetos_ativos = projetos_ativos.exclude(pk=self.pk)
+        if projetos_ativos.exists():
+            raise ValidationError('Este cliente já possui este serviço contratado.')
             
     def save(self, *args, **kwargs):
         self.full_clean()

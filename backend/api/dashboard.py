@@ -72,6 +72,7 @@ class ExtratoQuerySchema(Schema):
 
 class ExtratoItemSchema(Schema):
     nome: str = Field(..., description="Nome do cliente")
+    empresa: str = Field(..., description="Empresa do cliente")
     data: str = Field(..., description="Data do pagamento")
     servico: str = Field(..., description="Nome do serviço")
     valor: str = Field(..., description="Valor do pagamento")
@@ -287,6 +288,7 @@ def dashboard_extrato(request, filtros: ExtratoQuerySchema = Query(...)):
     payload = [
         {
             "nome": p.projeto.cliente.nome,
+            "empresa": p.projeto.cliente.empresa or "Não informada",
             "data": p.data.isoformat(),
             "servico": p.projeto.servico.nome,
             "valor": str(p.valor),

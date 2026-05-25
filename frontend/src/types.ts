@@ -14,6 +14,7 @@ export type TokenResponse = {
 export type Cliente = {
   id: number
   nome: string
+  empresa: string
   email?: string | null
   telefone?: string | null
   total_acumulado: string

@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi'
 import type { Cliente, Servico, ServicoDetailResponse } from '../types'
 import { ApiError } from '../lib/http'
+import { useAuth } from '../hooks/useAuth'
+import { API_BASE_URL } from '../config'
 
 export function ServicoDetailPage() {
   const { id } = useParams()
@@ -17,6 +19,25 @@ export function ServicoDetailPage() {
   )
   const [clientes, setClientes] = useState<Cliente[]>([])
   const [error, setError] = useState('')
+
+  // Estados e Handlers para Vinculação em Massa de Clientes
+  const [todosClientes, setTodosClientes] = useState<Cliente[]>([])
+  const [showBulkModal, setShowBulkModal] = useState(false)
+  const [selectedClientes, setSelectedClientes] = useState<number[]>([])
+  const [bulkForm, setBulkForm] = useState({
+    tipo_recorrencia: 'AVULSO',
+    valor: '',
+    dia_vencimento: '5',
+  })
+
+  const loadTodosClientes = async () => {
+    try {
+      const data = await request<Cliente[]>('/clientes/')
+      setTodosClientes(data)
+    } catch (err) {
+      console.error(err)
+    }
+  }
 
   const load = useCallback(async () => {
     if (!servicoId) return
@@ -39,8 +60,83 @@ export function ServicoDetailPage() {
     return () => window.clearTimeout(timer)
   }, [load])
 
-  const handlePrint = () => {
-    window.print()
+  const { accessToken } = useAuth()
+  const [exportingPdf, setExportingPdf] = useState(false)
+
+  const handleExportPdf = async () => {
+    if (!servicoId || !accessToken) return
+    setExportingPdf(true)
+    setError('')
+    try {
+      const response = await fetch(`${API_BASE_URL}/servicos/${servicoId}/pdf`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      })
+      if (!response.ok) {
+        throw new Error('Falha ao gerar o PDF comercial.')
+      }
+      
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safeTitle = servico?.nome ? servico.nome.replace(/\s+/g, '_') : 'Servico'
+      a.download = `Portfolio_${safeTitle}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error(err)
+      setError('Erro ao exportar PDF comercial. Tente novamente.')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
+
+  const handleOpenBulkModal = async () => {
+    await loadTodosClientes()
+    setSelectedClientes([])
+    setBulkForm({
+      tipo_recorrencia: 'AVULSO',
+      valor: '',
+      dia_vencimento: '5',
+    })
+    setShowBulkModal(true)
+  }
+
+  const onBulkSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedClientes.length === 0) {
+      alert('Selecione ao menos um cliente.')
+      return
+    }
+    const valorNormalizado = bulkForm.valor.trim().replace(',', '.')
+    if (valorNormalizado) {
+      const valorNumerico = Number(valorNormalizado)
+      if (!Number.isFinite(valorNumerico) || valorNumerico <= 0) {
+        alert('Valor inválido. Informe um número maior que zero.')
+        return
+      }
+    }
+    setError('')
+    try {
+      const res = await request<{ message: string }>(`/servicos/${servicoId}/vincular-clientes-massa`, {
+        method: 'POST',
+        body: {
+          cliente_ids: selectedClientes,
+          tipo_recorrencia: bulkForm.tipo_recorrencia,
+          valor: valorNormalizado || undefined,
+          dia_vencimento: Number(bulkForm.dia_vencimento),
+        },
+      })
+      alert(res.message)
+      setShowBulkModal(false)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao vincular clientes em massa')
+    }
   }
 
   const clientesVinculados = clientes
@@ -86,11 +182,14 @@ export function ServicoDetailPage() {
         </div>
         <button
           type="button"
-          onClick={handlePrint}
-          className="bg-primary text-on-primary font-bold py-sm px-md rounded-xl flex items-center justify-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-lg"
+          onClick={handleExportPdf}
+          disabled={exportingPdf}
+          className="bg-primary text-on-primary font-bold py-sm px-md rounded-xl flex items-center justify-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed select-none"
         >
-          <span className="material-symbols-outlined">print</span>
-          Exportar PDF Comercial
+          <span className={`material-symbols-outlined ${exportingPdf ? 'animate-spin' : ''}`}>
+            {exportingPdf ? 'sync' : 'picture_as_pdf'}
+          </span>
+          {exportingPdf ? 'Gerando PDF...' : 'Exportar PDF Comercial'}
         </button>
       </section>
 
@@ -180,14 +279,23 @@ export function ServicoDetailPage() {
 
       {/* Clientes Vinculados Section (Hidden on Print) */}
       <article className="organic-card rounded-xl overflow-hidden bg-white shadow-sm border border-outline-variant/30 no-print">
-        <div className="px-lg py-md bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10">
-          <h3 className="font-bold text-xs">Clientes Atendidos com este Serviço</h3>
+        <div className="px-lg py-md bg-surface-container-high flex justify-between items-center border-b border-outline/10">
+          <h3 className="font-bold text-xs uppercase tracking-widest text-secondary">Clientes Atendidos com este Serviço</h3>
+          <button
+            type="button"
+            onClick={handleOpenBulkModal}
+            className="bg-primary text-on-primary font-bold py-xs px-md rounded-xl text-xs flex items-center gap-xs select-none hover:brightness-110 active:scale-95 transition-all shadow-sm"
+          >
+            <span className="material-symbols-outlined text-sm">group_add</span>
+            Vincular Clientes em Massa
+          </button>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold border-b border-outline/10">
                 <th className="px-lg py-md font-semibold">Cliente</th>
+                <th className="px-lg py-md font-semibold">Empresa</th>
                 <th className="px-lg py-md font-semibold">E-mail</th>
                 <th className="px-lg py-md font-semibold">Telefone</th>
               </tr>
@@ -199,6 +307,9 @@ export function ServicoDetailPage() {
                     <Link to={`/clientes/${cliente.id}`} className="hover:underline">
                       {cliente.nome}
                     </Link>
+                  </td>
+                  <td className="px-lg py-lg text-on-surface-variant font-medium text-xs">
+                    {cliente.empresa || 'Não informada'}
                   </td>
                   <td className="px-lg py-lg text-on-surface-variant font-medium">
                     {cliente.email || '-'}
@@ -219,6 +330,137 @@ export function ServicoDetailPage() {
           </table>
         </div>
       </article>
+
+      {/* Modal Vinculação em Massa */}
+      {showBulkModal && (() => {
+        const alreadyLinkedIds = new Set(clientes.map((c) => c.id))
+        const disponiveis = todosClientes.filter((c) => !alreadyLinkedIds.has(c.id))
+
+        return (
+          <div
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              background: 'rgba(28, 38, 30, 0.4)',
+              backdropFilter: 'blur(4px)',
+              display: 'grid',
+              placeItems: 'center',
+              zIndex: 99999,
+            }}
+          >
+            <div className="card bg-white p-lg rounded-xl shadow-2xl border border-outline-variant/30" style={{ width: 'min(460px, 94vw)' }}>
+              <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', fontFamily: 'var(--font-heading)' }} className="text-primary">
+                Vincular Clientes em Massa
+              </h3>
+
+              <form className="space-y-md" onSubmit={onBulkSubmit}>
+                <div>
+                  <label className="block text-sm font-semibold text-outline mb-1">
+                    Selecione os Clientes
+                  </label>
+                  {disponiveis.length === 0 ? (
+                    <p className="text-xs text-outline italic p-sm bg-surface-container-low rounded-xl border border-outline/10">
+                      Todos os clientes já possuem este serviço contratado.
+                    </p>
+                  ) : (
+                    <div className="max-h-48 overflow-y-auto space-y-xs border border-outline/10 p-sm rounded-xl bg-surface-container-lowest">
+                      {disponiveis.map((c) => (
+                        <label key={c.id} className="flex items-center gap-sm p-xs hover:bg-surface-container-low rounded-lg cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedClientes.includes(c.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedClientes((prev) => [...prev, c.id])
+                              } else {
+                                setSelectedClientes((prev) => prev.filter((id) => id !== c.id))
+                              }
+                            }}
+                            className="rounded text-primary focus:ring-0 w-4 h-4 cursor-pointer"
+                          />
+                          <div className="flex flex-col">
+                            <span className="font-semibold text-sm text-on-surface">{c.nome}</span>
+                            <span className="text-[11px] text-outline">{c.empresa || 'Não informada'}</span>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {disponiveis.length > 0 && (
+                  <>
+                    <label className="block text-sm font-semibold text-outline">
+                      Tipo de Contrato / Pagamento Padrão
+                      <select
+                        className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                        value={bulkForm.tipo_recorrencia}
+                        onChange={(e) =>
+                          setBulkForm((prev) => ({ ...prev, tipo_recorrencia: e.target.value }))
+                        }
+                      >
+                        <option value="AVULSO">Sem Recorrência / Avulso</option>
+                        <option value="MENSAL">Mensalidade Recorrente</option>
+                      </select>
+                    </label>
+
+                    <label className="block text-sm font-semibold text-outline">
+                      {bulkForm.tipo_recorrencia === 'MENSAL' ? 'Valor da Mensalidade (R$)' : 'Valor do Contrato (R$, opcional)'}
+                      <input
+                        required={bulkForm.tipo_recorrencia === 'MENSAL'}
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        placeholder="Ex: 1500.00"
+                        className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                        value={bulkForm.valor}
+                        onChange={(e) =>
+                          setBulkForm((prev) => ({ ...prev, valor: e.target.value }))
+                        }
+                      />
+                    </label>
+
+                    {bulkForm.tipo_recorrencia === 'MENSAL' && (
+                      <label className="block text-sm font-semibold text-outline">
+                        Dia de Vencimento Padrão (1 a 28)
+                        <input
+                          required
+                          type="number"
+                          min="1"
+                          max="28"
+                          className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                          value={bulkForm.dia_vencimento}
+                          onChange={(e) =>
+                            setBulkForm((prev) => ({ ...prev, dia_vencimento: e.target.value }))
+                          }
+                        />
+                      </label>
+                    )}
+                  </>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                  <button
+                    type="button"
+                    className="px-md py-sm bg-surface-container-high rounded-xl text-outline font-bold text-sm"
+                    onClick={() => setShowBulkModal(false)}
+                  >
+                    Cancelar
+                  </button>
+                  {disponiveis.length > 0 && (
+                    <button className="px-md py-sm bg-primary text-on-primary rounded-xl font-bold text-sm shadow-md" type="submit">
+                      Vincular Selecionados
+                    </button>
+                  )}
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }

@@ -68,18 +68,13 @@ def create_projeto(request, payload: Form[ProjetoInSchema]):
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado ou não pertence a você"}
 
-    tipo_rec = payload.tipo_recorrencia or 'AVULSO'
-    ativo_rec = payload.ativo if payload.ativo is not None else True
-    if tipo_rec == 'MENSAL' and ativo_rec:
-        colisao = Projeto.objects.filter(
-            usuario=request.auth,
-            cliente=cliente,
-            servico=servico,
-            recorrencia_ativa=True,
-            tipo_recorrencia='MENSAL'
-        ).exists()
-        if colisao:
-            return 400, {"detail": "Já existe um contrato com recorrência ativa para este cliente e serviço. Novos contratos com recorrência ativa são bloqueados. Por favor, adicione como tipo Avulso."}
+    colisao = Projeto.objects.filter(
+        cliente=cliente,
+        servico=servico,
+        deletado_em__isnull=True
+    ).exists()
+    if colisao:
+        return 400, {"detail": "Este cliente já possui este serviço contratado."}
 
     projeto = Projeto.objects.create(
         usuario=request.auth,
@@ -114,18 +109,13 @@ def update_projeto(request, projeto_id: int, payload: ProjetoInSchema):
     except Servico.DoesNotExist:
         return 404, {"detail": "Serviço não encontrado ou não pertence a você"}
 
-    tipo_rec = payload.tipo_recorrencia or 'AVULSO'
-    ativo_rec = payload.ativo if payload.ativo is not None else True
-    if tipo_rec == 'MENSAL' and ativo_rec:
-        colisao = Projeto.objects.filter(
-            usuario=request.auth,
-            cliente=cliente,
-            servico=servico,
-            recorrencia_ativa=True,
-            tipo_recorrencia='MENSAL'
-        ).exclude(id=projeto_id).exists()
-        if colisao:
-            return 400, {"detail": "Já existe outro contrato com recorrência ativa para este cliente e serviço. Por favor, configure este contrato como tipo Avulso."}
+    colisao = Projeto.objects.filter(
+        cliente=cliente,
+        servico=servico,
+        deletado_em__isnull=True
+    ).exclude(id=projeto_id).exists()
+    if colisao:
+        return 400, {"detail": "Este cliente já possui este serviço contratado."}
 
     projeto.cliente = cliente
     projeto.servico = servico

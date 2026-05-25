@@ -52,6 +52,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loading = false
 
   const persist = useCallback((payload: TokenResponse) => {
+    // Purga todo e qualquer cache local da API de sessões ou bancos antigos ao autenticar
+    clearApiCache()
     setUser(payload.user)
     setAccessToken(payload.access)
     setRefreshToken(payload.refresh)

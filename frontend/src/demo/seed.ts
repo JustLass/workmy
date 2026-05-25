@@ -33,6 +33,7 @@ export function createDemoSeed(): {
     {
       id: 1,
       nome: 'Ana Costa Design',
+      empresa: 'Ana Costa Design Co.',
       email: 'ana@exemplo.com',
       telefone: '(11) 98765-4321',
       total_acumulado: '10500.00',
@@ -41,6 +42,7 @@ export function createDemoSeed(): {
     {
       id: 2,
       nome: 'João Mendes Tech',
+      empresa: 'Mendes Tech',
       email: 'joao@exemplo.com',
       telefone: '(21) 99876-5432',
       total_acumulado: '4800.00',
@@ -49,6 +51,7 @@ export function createDemoSeed(): {
     {
       id: 3,
       nome: 'Studio Lumina',
+      empresa: 'Lumina Studio',
       email: 'contato@lumina.com',
       telefone: null,
       total_acumulado: '2200.00',

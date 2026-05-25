@@ -80,6 +80,7 @@ export async function demoRequest<T>(
     const cliente = {
       id: store.nextId.cliente++,
       nome: body.nome,
+      empresa: body.empresa || 'Não informada',
       email: body.email || null,
       telefone: body.telefone || null,
       total_acumulado: '0',
@@ -98,6 +99,23 @@ export async function demoRequest<T>(
     store.projetos = store.projetos.filter((p) => p.cliente_id !== id)
     saveDemoStore(store)
     return { message: 'ok' } as T
+  }
+
+  const clientePut = path.match(/^\/clientes\/(\d+)$/)
+  if (clientePut && method === 'PUT') {
+    const id = Number(clientePut[1])
+    const idx = store.clientes.findIndex((c) => c.id === id)
+    if (idx < 0) throw new ApiError('Cliente não encontrado', 404)
+    store.clientes[idx] = {
+      ...store.clientes[idx],
+      nome: body.nome,
+      empresa: body.empresa || 'Não informada',
+      email: body.email || null,
+      telefone: body.telefone || null,
+    }
+    saveDemoStore(store)
+    notifyDemoMutation()
+    return store.clientes[idx] as T
   }
 
   const clienteDetalhe = path.match(/^\/clientes\/(\d+)\/detalhe$/)
@@ -144,6 +162,69 @@ export async function demoRequest<T>(
     }
   }
 
+  const servicoVincularMassa = path.match(/^\/servicos\/(\d+)\/vincular-clientes-massa$/)
+  if (servicoVincularMassa && method === 'POST') {
+    const sId = Number(servicoVincularMassa[1])
+    const servico = store.servicos.find((s) => s.id === sId)
+    if (!servico) throw new ApiError('Serviço não encontrado', 404)
+    
+    let clientIds: number[] = []
+    if (options?.body && typeof options.body === 'object') {
+      const parsedBody = options.body as any
+      if (Array.isArray(parsedBody.cliente_ids)) {
+        clientIds = parsedBody.cliente_ids.map(Number)
+      } else if (typeof parsedBody.cliente_ids === 'string') {
+        clientIds = parsedBody.cliente_ids.split(',').map(Number).filter(Boolean)
+      }
+    }
+    
+    let added = 0
+    let ignored = 0
+    
+    for (const cId of clientIds) {
+      const cliente = store.clientes.find((c) => c.id === cId)
+      if (!cliente) {
+        ignored++
+        continue
+      }
+      
+      const alreadyLinked = store.projetos.some((p) => p.cliente_id === cId && p.servico_id === sId)
+      if (alreadyLinked) {
+        ignored++
+        continue
+      }
+      
+      const tipoRec = body.tipo_recorrencia || 'AVULSO'
+      const valor = body.valor || null
+      
+      store.projetos.push({
+        id: store.nextId.projeto++,
+        cliente_id: cId,
+        cliente_nome: cliente.nome,
+        servico_id: sId,
+        servico_nome: servico.nome,
+        mensalista: tipoRec === 'MENSAL',
+        valor_mensal: tipoRec === 'MENSAL' ? valor : null,
+        dia_vencimento: Number(body.dia_vencimento || 5),
+        recorrencia_inicio: null,
+        criado_em: new Date().toISOString(),
+        status: 'DISCOVERY',
+        progresso: 0,
+        tipo_recorrencia: tipoRec as any,
+        ativo: true,
+        total_acumulado: '0.00'
+      })
+      added++
+    }
+    
+    recalcClienteTotais(store)
+    saveDemoStore(store)
+    notifyDemoMutation()
+    return {
+      message: `${added} cliente(s) vinculado(s) com sucesso. ${ignored} ignorado(s) por já possuírem o serviço ou serem inválidos.`
+    } as T
+  }
+
   if (path === '/projetos/' && method === 'GET') {
     return [...store.projetos] as T
   }
@@ -152,6 +233,11 @@ export async function demoRequest<T>(
     const cliente = store.clientes.find((c) => c.id === Number(body.cliente_id))
     const servico = store.servicos.find((s) => s.id === Number(body.servico_id))
     if (!cliente || !servico) throw new ApiError('Cliente ou serviço inválido', 400)
+    
+    const alreadyLinked = store.projetos.some((p) => p.cliente_id === cliente.id && p.servico_id === servico.id)
+    if (alreadyLinked) {
+      throw new ApiError('Este cliente já possui este serviço contratado.', 400)
+    }
     const projeto = {
       id: store.nextId.projeto++,
       cliente_id: cliente.id,
@@ -330,6 +416,52 @@ export async function demoRequest<T>(
     const clienteId = query.cliente_id ? Number(query.cliente_id) : undefined
     const tipo = query.tipo_pagamento ? String(query.tipo_pagamento) : undefined
     return buildDashboardMensal(store, mes, ano, clienteId, tipo) as T
+  }
+
+  if (path === '/dashboard/extrato' && method === 'GET') {
+    const mes = query.mes ? Number(query.mes) : undefined
+    const ano = query.ano ? Number(query.ano) : undefined
+    const dataInicioStr = query.data_inicio ? String(query.data_inicio) : undefined
+    const dataFimStr = query.data_fim ? String(query.data_fim) : undefined
+    const clienteId = query.cliente_id ? Number(query.cliente_id) : undefined
+    const tipo = query.tipo_pagamento ? String(query.tipo_pagamento) : undefined
+
+    let filtered = [...store.pagamentos]
+
+    if (clienteId) {
+      const projIds = store.projetos.filter(p => p.cliente_id === clienteId).map(p => p.id)
+      filtered = filtered.filter(p => projIds.includes(p.projeto_id))
+    }
+
+    if (tipo) {
+      filtered = filtered.filter(p => p.tipo_pagamento === tipo)
+    }
+
+    if (dataInicioStr && dataFimStr) {
+      filtered = filtered.filter(p => p.data >= dataInicioStr && p.data <= dataFimStr)
+    } else {
+      const today = new Date()
+      const m = mes || (today.getMonth() + 1)
+      const y = ano || today.getFullYear()
+      const startStr = `${y}-${String(m).padStart(2, '0')}-01`
+      const endStr = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}-01`
+      filtered = filtered.filter(p => p.data >= startStr && p.data < endStr)
+    }
+
+    filtered.sort((a, b) => b.data.localeCompare(a.data) || b.id - a.id)
+
+    return filtered.map(p => {
+      const proj = store.projetos.find(proj => proj.id === p.projeto_id)
+      const cli = proj ? store.clientes.find(c => c.id === proj.cliente_id) : undefined
+      return {
+        nome: p.projeto_cliente_nome,
+        empresa: cli ? cli.empresa : 'Não informada',
+        data: p.data,
+        servico: p.projeto_servico_nome,
+        valor: p.valor,
+        tipo_pagamento: p.tipo_pagamento,
+      }
+    }) as T
   }
 
   if (path === '/health/ping' && method === 'GET') {

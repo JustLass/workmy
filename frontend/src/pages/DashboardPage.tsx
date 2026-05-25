@@ -1,9 +1,12 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useResourceQuery } from '../hooks/useResourceQuery'
-import type { DashboardMensal, Pagamento, Projeto } from '../types'
+import type { DashboardMensal, Pagamento, Projeto, Cliente } from '../types'
 import { InteractiveLineChart } from '../components/InteractiveCharts'
+import { useApi } from '../hooks/useApi'
 
 export function DashboardPage() {
+  const { request } = useApi()
+
   const { data: rawProjetos } = useResourceQuery<Projeto[]>('/projetos/', {
     watchScopes: ['/projetos/', '/pagamentos/'],
   })
@@ -14,11 +17,95 @@ export function DashboardPage() {
   })
   const pagamentos = rawPagamentos ?? []
 
+  const { data: rawClientes } = useResourceQuery<Cliente[]>('/clientes/', {
+    watchScopes: ['/clientes/', '/pagamentos/'],
+  })
+  const clientes = rawClientes ?? []
+
   const { data: dataFinanceiro } = useResourceQuery<DashboardMensal>('/dashboard/mensal', {
     watchScopes: ['/dashboard/mensal', '/pagamentos/', '/projetos/'],
   })
 
   const [activitySearch, setActivitySearch] = useState('')
+  const [exportPeriod, setExportPeriod] = useState(() => {
+    const today = new Date()
+    const startStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`
+    const endStr = today.toISOString().slice(0, 10)
+    return { data_inicio: startStr, data_fim: endStr }
+  })
+  const [exportingCsv, setExportingCsv] = useState(false)
+  const [exportError, setExportError] = useState('')
+
+  const pendingLeadsCount = useMemo(() => {
+    const today = new Date()
+    const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+    
+    return clientes.filter((c) => {
+      const clientPayments = pagamentos.filter(
+        p => p.projeto_cliente_nome?.trim().toLowerCase() === c.nome.trim().toLowerCase()
+      )
+      if (clientPayments.length === 0) {
+        const createdDate = new Date(c.criado_em)
+        return createdDate < oneMonthAgo
+      }
+      const paymentDates = clientPayments
+        .map(p => new Date(p.data + 'T12:00:00'))
+        .filter(d => !isNaN(d.getTime()))
+      if (paymentDates.length === 0) {
+        const createdDate = new Date(c.criado_em)
+        return createdDate < oneMonthAgo
+      }
+      const maxDate = new Date(Math.max(...paymentDates.map(d => d.getTime())))
+      return maxDate < oneMonthAgo
+    }).length
+  }, [clientes, pagamentos])
+
+  const handleExportCsv = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setExportingCsv(true)
+    setExportError('')
+    try {
+      const data = await request<any[]>('/dashboard/extrato', {
+        query: {
+          data_inicio: exportPeriod.data_inicio,
+          data_fim: exportPeriod.data_fim
+        }
+      })
+      
+      if (!data || data.length === 0) {
+        setExportError('Nenhum registro encontrado no período selecionado.')
+        return
+      }
+
+      const headers = ['Data', 'Cliente', 'Empresa', 'Serviço', 'Valor', 'Tipo de Pagamento']
+      const rows = data.map(item => [
+        item.data,
+        item.nome,
+        item.empresa || 'Não informada',
+        item.servico,
+        item.valor,
+        item.tipo_pagamento === 'MENSAL' ? 'Mensalidade' : 'Avulso'
+      ])
+      
+      const csvContent = [
+        headers.join(';'),
+        ...rows.map(r => r.map(val => `"${String(val).replace(/"/g, '""')}"`).join(';'))
+      ].join('\n')
+      
+      const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.setAttribute('href', url)
+      link.setAttribute('download', `workmy_relatorio_${exportPeriod.data_inicio}_a_${exportPeriod.data_fim}.csv`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err) {
+      setExportError('Erro ao exportar relatório CSV. Tente novamente.')
+    } finally {
+      setExportingCsv(false)
+    }
+  }
 
   // Formatting utils
   const formatMoney = (val: string | number | null | undefined) => {
@@ -130,7 +217,7 @@ export function DashboardPage() {
       </section>
 
       {/* Metrics Row */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-lg mb-xl">
+      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-lg mb-xl">
         {/* Monthly Revenue Card */}
         <div className="glass-panel rounded-xl p-lg relative overflow-hidden group hover:border-primary/30 transition-all duration-300 soft-shadow-green bg-surface-container-lowest">
           <div className="relative z-10">
@@ -179,7 +266,22 @@ export function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Leads Pendentes Card */}
+        <div className="glass-panel rounded-xl p-lg relative overflow-hidden group hover:border-error/30 transition-all duration-300 soft-shadow-green bg-surface-container-lowest">
+          <div className="relative z-10 flex items-center justify-between">
+            <div>
+              <p className="text-label-sm uppercase tracking-widest text-secondary font-bold mb-md">Leads Pendentes</p>
+              <h3 className="font-display-lg text-4xl text-error mb-xs">{pendingLeadsCount}</h3>
+            </div>
+            <div className="w-14 h-14 rounded-full bg-error-container/40 flex items-center justify-center text-error shrink-0">
+              <span className="material-symbols-outlined text-[32px]">warning</span>
+            </div>
+          </div>
+        </div>
       </section>
+
+
 
       {/* Bento Grid Main Section */}
       <div className="grid grid-cols-12 gap-lg">
@@ -207,10 +309,9 @@ export function DashboardPage() {
               <span className="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-outline/60 text-[16px]">search</span>
               <input
                 type="text"
-                placeholder="Pesquisar faturamentos..."
                 value={activitySearch}
                 onChange={(e) => setActivitySearch(e.target.value)}
-                className="w-full bg-surface-container-low border border-outline/10 rounded-xl py-xs pl-8 pr-sm text-xs focus:outline-none focus:border-primary text-on-surface placeholder:text-outline/55"
+                className="w-full bg-surface-container-low border border-outline/10 rounded-xl py-xs pl-8 pr-sm text-xs focus:outline-none focus:border-primary text-on-surface"
               />
             </div>
           </div>
@@ -234,53 +335,51 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent Projects Table */}
-        <div className="col-span-12 glass-panel rounded-xl overflow-hidden soft-shadow-green bg-surface-container-lowest">
-          <div className="px-lg py-md flex justify-between items-center border-b border-outline-variant/20">
-            <h4 className="font-headline-md text-on-surface text-lg font-bold">Projetos Recentes</h4>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-surface-container-high text-label-sm text-secondary uppercase tracking-widest font-bold">
-                  <th className="px-lg py-md font-semibold">Nome do Projeto</th>
-                  <th className="px-lg py-md font-semibold">Cliente</th>
-                  <th className="px-lg py-md font-semibold">Progresso</th>
-                  <th className="px-lg py-md font-semibold">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-outline-variant/20">
-                {projetos.slice(0, 3).map((proj) => (
-                  <tr className="hover:bg-primary-fixed/10 transition-colors group" key={proj.id}>
-                    <td className="px-lg py-lg">
-                      <div className="flex items-center gap-md">
-                        <div className="w-2 h-8 rounded-full bg-primary"></div>
-                        <span className="font-bold text-on-surface">{proj.servico_nome}</span>
-                      </div>
-                    </td>
-                    <td className="px-lg py-lg text-on-surface-variant">{proj.cliente_nome}</td>
-                    <td className="px-lg py-lg text-primary font-mono-data font-bold">
-                      {proj.progresso}%
-                    </td>
-                    <td className="px-lg py-lg">
-                      <span className="px-sm py-xs rounded-full bg-secondary-container text-on-secondary-container text-[10px] font-bold uppercase">
-                        {proj.status === 'DISCOVERY' ? 'Descoberta' : proj.status === 'IN_PROGRESS' ? 'Em Progresso' : proj.status === 'REVIEW' ? 'Revisão' : 'Concluído'}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-                {projetos.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="text-center py-lg text-secondary">
-                      Nenhum projeto ativo cadastrado.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       </div>
+
+      {/* CSV Export Panel */}
+      <section className="glass-panel rounded-xl p-lg mt-xl bg-surface-container-lowest border border-outline-variant/30 relative overflow-hidden">
+        <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-md">
+          <div>
+            <h4 className="font-display-lg text-lg text-primary font-bold flex items-center gap-xs">
+              <span className="material-symbols-outlined text-primary text-[22px]">download</span>
+              Exportar Relatório Consolidado (CSV)
+            </h4>
+            <p className="text-on-surface-variant text-sm mt-xs">Escolha o período customizado para download da planilha de fluxo de caixa.</p>
+          </div>
+          <form onSubmit={handleExportCsv} className="flex flex-wrap items-end gap-md w-full md:w-auto">
+            <label className="block text-xs font-semibold text-outline">
+              Data de Início
+              <input
+                type="date"
+                required
+                value={exportPeriod.data_inicio}
+                onChange={(e) => setExportPeriod(prev => ({ ...prev, data_inicio: e.target.value }))}
+                className="mt-1 block bg-surface-container-lowest border border-outline/20 rounded-xl py-xs px-sm font-body-md focus:border-primary outline-none text-on-surface text-xs"
+              />
+            </label>
+            <label className="block text-xs font-semibold text-outline">
+              Data de Fim
+              <input
+                type="date"
+                required
+                value={exportPeriod.data_fim}
+                onChange={(e) => setExportPeriod(prev => ({ ...prev, data_fim: e.target.value }))}
+                className="mt-1 block bg-surface-container-lowest border border-outline/20 rounded-xl py-xs px-sm font-body-md focus:border-primary outline-none text-on-surface text-xs"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={exportingCsv}
+              className="bg-primary text-on-primary font-bold py-sm px-md rounded-xl text-xs flex items-center justify-center gap-sm hover:brightness-110 active:scale-95 transition-all shadow-md select-none disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-sm">table_view</span>
+              {exportingCsv ? 'Gerando...' : 'Exportar CSV'}
+            </button>
+          </form>
+        </div>
+        {exportError && <p className="text-xs text-error mt-sm font-semibold">{exportError}</p>}
+      </section>
     </div>
   )
 }

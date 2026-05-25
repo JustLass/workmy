@@ -47,6 +47,7 @@ def list_clientes(request):
         {
             "id": c.id,
             "nome": c.nome,
+            "empresa": c.empresa,
             "email": c.email,
             "telefone": c.telefone,
             "total_acumulado": str(c.total_acumulado),
@@ -71,6 +72,7 @@ def get_cliente(request, cliente_id: int):
         payload = {
             "id": cliente.id,
             "nome": cliente.nome,
+            "empresa": cliente.empresa,
             "email": cliente.email,
             "telefone": cliente.telefone,
             "total_acumulado": str(
@@ -124,6 +126,7 @@ def get_cliente_detalhe(request, cliente_id: int):
         "cliente": {
             "id": cliente.id,
             "nome": cliente.nome,
+            "empresa": cliente.empresa,
             "email": cliente.email,
             "telefone": cliente.telefone,
             "total_acumulado": str(
@@ -162,6 +165,7 @@ def create_cliente(request, payload: Form[ClienteInSchema]):
     cliente = Cliente.objects.create(
         usuario=request.auth,
         nome=payload.nome,
+        empresa=payload.empresa or "Não informada",
         email=payload.email,
         telefone=payload.telefone
     )
@@ -171,6 +175,7 @@ def create_cliente(request, payload: Form[ClienteInSchema]):
     return 201, {
         "id": cliente.id,
         "nome": cliente.nome,
+        "empresa": cliente.empresa,
         "email": cliente.email,
         "telefone": cliente.telefone,
         "total_acumulado": "0",
@@ -189,6 +194,7 @@ def update_cliente(request, cliente_id: int, payload: ClienteInSchema):
         return 404, {"detail": "Cliente não encontrado"}
     
     cliente.nome = payload.nome
+    cliente.empresa = payload.empresa or "Não informada"
     cliente.email = payload.email
     cliente.telefone = payload.telefone
     cliente.save()
@@ -198,6 +204,7 @@ def update_cliente(request, cliente_id: int, payload: ClienteInSchema):
     return 200, {
         "id": cliente.id,
         "nome": cliente.nome,
+        "empresa": cliente.empresa,
         "email": cliente.email,
         "telefone": cliente.telefone,
         "total_acumulado": str(

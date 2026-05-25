@@ -14,7 +14,7 @@ export function ClienteDetailPage() {
   const stateClienteNome = (location.state as { clienteNome?: string } | null)?.clienteNome
 
   const [cliente, setCliente] = useState<Cliente | null>(
-    stateClienteNome ? { id: clienteId, nome: stateClienteNome, total_acumulado: '0', criado_em: '' } : null,
+    stateClienteNome ? { id: clienteId, nome: stateClienteNome, empresa: 'Não informada', total_acumulado: '0', criado_em: '' } : null,
   )
   const [servicos, setServicos] = useState<Servico[]>([])
   const [projetos, setProjetos] = useState<Projeto[]>([])
@@ -33,6 +33,31 @@ export function ClienteDetailPage() {
   const [servicoId, setServicoId] = useState('')
   const [error, setError] = useState('')
 
+  const isPending = useMemo(() => {
+    if (!cliente) return false
+    const today = new Date()
+    const oneMonthAgo = new Date(today.getFullYear(), today.getMonth() - 1, today.getDate())
+    
+    if (pagamentos.length === 0) {
+      if (!cliente.criado_em) return false
+      const createdDate = new Date(cliente.criado_em)
+      return createdDate < oneMonthAgo
+    }
+    
+    const paymentDates = pagamentos
+      .map(p => new Date(p.data + 'T12:00:00'))
+      .filter(d => !isNaN(d.getTime()))
+      
+    if (paymentDates.length === 0) {
+      if (!cliente.criado_em) return false
+      const createdDate = new Date(cliente.criado_em)
+      return createdDate < oneMonthAgo
+    }
+    
+    const maxDate = new Date(Math.max(...paymentDates.map(d => d.getTime())))
+    return maxDate < oneMonthAgo
+  }, [cliente, pagamentos])
+
   // Estados e Handlers para Recorrência Mensal
   const [recorrenciaModalProjeto, setRecorrenciaModalProjeto] = useState<Projeto | null>(null)
   const [recorrenciaForm, setRecorrenciaForm] = useState({ valor_mensal: '', dia_vencimento: '5' })
@@ -49,6 +74,10 @@ export function ClienteDetailPage() {
   } | null>(null)
   const [editFileKey, setEditFileKey] = useState(100)
   const [editComprovanteBase64, setEditComprovanteBase64] = useState<string>('')
+
+  // Estados e Handlers para Edição do Cliente
+  const [showEditClientModal, setShowEditClientModal] = useState(false)
+  const [editClientForm, setEditClientForm] = useState({ nome: '', email: '', ddd: '', telefone_numero: '', empresa: '' })
 
   const handleDesativarRecorrencia = async (projetoId: number) => {
     if (!window.confirm('Desativar a recorrência mensal para este projeto? As parcelas futuras automáticas não serão mais geradas.')) return
@@ -151,6 +180,72 @@ export function ClienteDetailPage() {
       await load()
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao atualizar pagamento')
+    }
+  }
+
+  const handleOpenEditClientModal = () => {
+    if (!cliente) return
+    let ddd = ''
+    let telefone_numero = ''
+    if (cliente.telefone) {
+      const digits = cliente.telefone.replace(/\D/g, '')
+      if (digits.length >= 10) {
+        ddd = digits.slice(0, 2)
+        telefone_numero = digits.slice(2)
+      }
+    }
+    setEditClientForm({
+      nome: cliente.nome,
+      email: cliente.email || '',
+      ddd,
+      telefone_numero,
+      empresa: cliente.empresa || '',
+    })
+    setShowEditClientModal(true)
+  }
+
+  const onEditClientSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const dddLimpo = editClientForm.ddd.replace(/\D/g, '').slice(0, 2)
+    const numLimpo = editClientForm.telefone_numero.replace(/\D/g, '').slice(0, 9)
+    
+    let telefoneFormatado = ''
+    if (dddLimpo && numLimpo) {
+      if (numLimpo.length >= 9) {
+        telefoneFormatado = `(${dddLimpo}) ${numLimpo.slice(0, 5)}-${numLimpo.slice(5, 9)}`
+      } else if (numLimpo.length > 4) {
+        telefoneFormatado = `(${dddLimpo}) ${numLimpo.slice(0, 5)}-${numLimpo.slice(5)}`
+      } else {
+        telefoneFormatado = `(${dddLimpo}) ${numLimpo}`
+      }
+    }
+    
+    const telefoneValido =
+      !dddLimpo && !numLimpo
+        ? true
+        : /^\d{2}$/.test(dddLimpo) && /^\d{9}$/.test(numLimpo)
+
+    if (!telefoneValido) {
+      alert('Telefone inválido. Use DDD com 2 dígitos e celular com 9 dígitos.')
+      return
+    }
+
+    setError('')
+    try {
+      const updated = await request<Cliente>(`/clientes/${clienteId}`, {
+        method: 'PUT',
+        body: {
+          nome: editClientForm.nome,
+          email: editClientForm.email || undefined,
+          telefone: telefoneFormatado || undefined,
+          empresa: editClientForm.empresa || undefined,
+        },
+      })
+      setCliente(updated)
+      setShowEditClientModal(false)
+      await load()
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar cliente')
     }
   }
 
@@ -337,16 +432,39 @@ export function ClienteDetailPage() {
             <span className="material-symbols-outlined text-[16px]">arrow_back</span>
             Voltar para Clientes
           </button>
-          <h2 className="font-headline-md text-display-lg text-primary mb-xs font-bold text-2xl">
-            {cliente?.nome ?? 'Cliente'}
-          </h2>
-          <div className="flex items-center gap-md text-on-surface-variant mt-1">
+          <div className="flex items-center gap-md">
+            <h2 className="font-headline-md text-display-lg text-primary mb-xs font-bold text-2xl">
+              {cliente?.nome ?? 'Cliente'}
+            </h2>
+            <button
+              type="button"
+              onClick={handleOpenEditClientModal}
+              className="inline-flex items-center justify-center p-1 rounded-full text-outline hover:text-primary hover:bg-surface-container transition-all active:scale-95 no-print"
+              title="Editar informações do cliente"
+            >
+              <span className="material-symbols-outlined text-[20px]">edit</span>
+            </button>
+          </div>
+          <div className="flex items-center gap-md text-on-surface-variant mt-1 flex-wrap">
+            <span className="inline-flex items-center gap-xs px-sm py-[2px] rounded-lg bg-primary/10 text-primary border border-primary/20 text-xs font-semibold">
+              <span className="material-symbols-outlined text-[14px]">domain</span> {cliente?.empresa || 'Não informada'}
+            </span>
             <span className="flex items-center gap-xs text-label-sm uppercase font-bold text-sm">
               <span className="material-symbols-outlined text-[16px]">payments</span> Lucro Total: <span className="text-primary font-mono-data font-bold text-base ml-1">{lucroTotal}</span>
             </span>
           </div>
         </div>
       </section>
+
+      {isPending && (
+        <div className="mb-lg bg-error-container/40 border border-error text-error p-md rounded-xl flex items-start gap-md shadow-sm no-print">
+          <span className="material-symbols-outlined text-[24px] font-bold shrink-0">warning</span>
+          <div>
+            <h4 className="font-bold text-sm">Atenção: Acompanhamento Pendente</h4>
+            <p className="text-xs mt-0.5 opacity-90">Este cliente não possui nenhum pagamento registrado há mais de 1 mês. Recomenda-se realizar follow-up.</p>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p className="error mb-md text-error bg-error-container/40 p-sm rounded-lg border border-error-container">
@@ -440,7 +558,6 @@ export function ClienteDetailPage() {
               <label className="block text-sm font-semibold text-outline">
                 Descrição / Memorando
                 <input
-                  placeholder="Ex: Pagamento referente ao setup inicial..."
                   className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
                   value={novoPagamento.observacao}
                   onChange={(e) =>
@@ -749,7 +866,6 @@ export function ClienteDetailPage() {
                   type="number"
                   min="1"
                   max="28"
-                  placeholder="5"
                   className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
                   value={recorrenciaForm.dia_vencimento}
                   onChange={(e) => setRecorrenciaForm((prev) => ({ ...prev, dia_vencimento: e.target.value }))}
@@ -869,6 +985,110 @@ export function ClienteDetailPage() {
                   type="button"
                   className="px-md py-sm bg-surface-container-high rounded-xl text-outline font-bold text-sm"
                   onClick={() => setEditingPagamento(null)}
+                >
+                  Cancelar
+                </button>
+                <button className="px-md py-sm bg-primary text-on-primary rounded-xl font-bold text-sm shadow-md" type="submit">
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Editar Cliente */}
+      {showEditClientModal && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(28, 38, 30, 0.4)',
+            backdropFilter: 'blur(4px)',
+            display: 'grid',
+            placeItems: 'center',
+            zIndex: 99999,
+          }}
+        >
+          <div className="card bg-white p-lg rounded-xl shadow-2xl border border-outline-variant/30" style={{ width: 'min(460px, 94vw)' }}>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '18px', fontWeight: '700', fontFamily: 'var(--font-heading)' }} className="text-primary">
+              Editar Informações do Cliente
+            </h3>
+
+            <form className="space-y-md" onSubmit={onEditClientSubmit}>
+              <label className="block text-sm font-semibold text-outline">
+                Nome do Cliente
+                <input
+                  required
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={editClientForm.nome}
+                  onChange={(e) =>
+                    setEditClientForm((prev) => ({ ...prev, nome: e.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Empresa / Organização (Opcional)
+                <input
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={editClientForm.empresa}
+                  onChange={(e) =>
+                    setEditClientForm((prev) => ({ ...prev, empresa: e.target.value }))
+                  }
+                />
+              </label>
+
+              <label className="block text-sm font-semibold text-outline">
+                Endereço de E-mail
+                <input
+                  type="email"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={editClientForm.email}
+                  onChange={(e) =>
+                    setEditClientForm((prev) => ({ ...prev, email: e.target.value }))
+                  }
+                />
+              </label>
+
+              <div className="grid grid-cols-3 gap-md">
+                <label className="block text-sm font-semibold text-outline col-span-1">
+                  DDD
+                  <input
+                    inputMode="numeric"
+                    maxLength={2}
+                    className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                    value={editClientForm.ddd}
+                    onChange={(e) =>
+                      setEditClientForm((prev) => ({ ...prev, ddd: e.target.value.replace(/\D/g, '').slice(0, 2) }))
+                    }
+                  />
+                </label>
+                <label className="block text-sm font-semibold text-outline col-span-2">
+                  Número Celular
+                  <input
+                    inputMode="numeric"
+                    maxLength={9}
+                    className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                    value={editClientForm.telefone_numero}
+                    onChange={(e) =>
+                      setEditClientForm((prev) => ({
+                        ...prev,
+                        telefone_numero: e.target.value.replace(/\D/g, '').slice(0, 9),
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="px-md py-sm bg-surface-container-high rounded-xl text-outline font-bold text-sm"
+                  onClick={() => setShowEditClientModal(false)}
                 >
                   Cancelar
                 </button>

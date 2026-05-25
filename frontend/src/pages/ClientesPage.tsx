@@ -18,8 +18,10 @@ function initials(name: string) {
 export function ClientesPage() {
   const { request } = useApi()
   const [items, setItems] = useState<Cliente[]>([])
-  const [form, setForm] = useState({ nome: '', email: '', ddd: '', telefone_numero: '' })
+  const [pagamentos, setPagamentos] = useState<any[]>([])
+  const [form, setForm] = useState({ nome: '', email: '', ddd: '', telefone_numero: '', empresa: '' })
   const [search, setSearch] = useState('')
+  const [selectedCompany, setSelectedCompany] = useState('')
   const [loading, setLoading] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [error, setError] = useState('')
@@ -27,8 +29,12 @@ export function ClientesPage() {
   const load = useCallback(async () => {
     setError('')
     try {
-      const data = await request<Cliente[]>('/clientes/')
-      setItems(data)
+      const [clientesData, pagamentosData] = await Promise.all([
+        request<Cliente[]>('/clientes/'),
+        request<any[]>('/pagamentos/'),
+      ])
+      setItems(clientesData)
+      setPagamentos(pagamentosData)
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Erro ao carregar clientes')
     }
@@ -68,9 +74,10 @@ export function ClientesPage() {
           nome: form.nome,
           email: form.email,
           telefone: telefoneFormatado || undefined,
+          empresa: form.empresa || undefined,
         },
       })
-      setForm({ nome: '', email: '', ddd: '', telefone_numero: '' })
+      setForm({ nome: '', email: '', ddd: '', telefone_numero: '', empresa: '' })
       setShowAddModal(false)
       await load()
     } catch (err) {
@@ -93,26 +100,82 @@ export function ClientesPage() {
     }
   }
 
+  const companies = useMemo(() => {
+    const list = items.map((item) => item.empresa || 'Não informada')
+    return Array.from(new Set(list)).sort()
+  }, [items])
+
   const filteredItems = useMemo(() => {
+    let result = items
+    if (selectedCompany) {
+      result = result.filter((item) => (item.empresa || 'Não informada') === selectedCompany)
+    }
     const term = search.trim().toLowerCase()
-    return !term
-      ? items
-      : items.filter((item) =>
-      [item.nome, item.email ?? '', item.telefone ?? '']
-        .join(' ')
-        .toLowerCase()
-        .includes(term),
+    if (term) {
+      result = result.filter((item) =>
+        [item.nome, item.email ?? '', item.telefone ?? '', item.empresa ?? '']
+          .join(' ')
+          .toLowerCase()
+          .includes(term)
       )
-  }, [items, search])
+    }
+    return result
+  }, [items, search, selectedCompany])
+
+  // Algoritmo de Acompanhamento (Follow-up) & Leads Ativos
+  const today = useMemo(() => new Date(), [])
+  const currentMonth = useMemo(() => today.getMonth(), [today])
+  const currentYear = useMemo(() => today.getFullYear(), [today])
+  const oneMonthAgo = useMemo(() => {
+    const d = new Date(today)
+    d.setMonth(d.getMonth() - 1)
+    return d
+  }, [today])
+
+  const activeLeads = useMemo(() => {
+    const activeClientsSet = new Set<string>()
+    pagamentos.forEach((p) => {
+      if (!p.data) return
+      const pDate = new Date(p.data + 'T12:00:00')
+      if (pDate.getMonth() === currentMonth && pDate.getFullYear() === currentYear) {
+        if (p.projeto_cliente_nome) {
+          activeClientsSet.add(p.projeto_cliente_nome.trim().toLowerCase())
+        }
+      }
+    })
+    return items.filter(c => activeClientsSet.has(c.nome.trim().toLowerCase())).length
+  }, [items, pagamentos, currentMonth, currentYear])
+
+  const getClientStatus = useCallback((cliente: Cliente) => {
+    const clientPayments = pagamentos.filter(
+      p => p.projeto_cliente_nome?.trim().toLowerCase() === cliente.nome.trim().toLowerCase()
+    )
+    if (clientPayments.length === 0) {
+      const createdDate = new Date(cliente.criado_em)
+      return createdDate < oneMonthAgo ? 'PENDING' : 'OK'
+    }
+    const paymentDates = clientPayments
+      .map(p => new Date(p.data + 'T12:00:00'))
+      .filter(d => !isNaN(d.getTime()))
+    if (paymentDates.length === 0) {
+      const createdDate = new Date(cliente.criado_em)
+      return createdDate < oneMonthAgo ? 'PENDING' : 'OK'
+    }
+    const maxDate = new Date(Math.max(...paymentDates.map(d => d.getTime())))
+    return maxDate < oneMonthAgo ? 'PENDING' : 'OK'
+  }, [pagamentos, oneMonthAgo])
+
+  const pendingLeads = useMemo(() => {
+    return items.filter(c => getClientStatus(c) === 'PENDING').length
+  }, [items, getClientStatus])
 
   // Derived stats
   const totalClients = items.length
-  const activeLeads = items.filter((c) => Number(c.total_acumulado || 0) === 0).length
 
   return (
     <div className="bg-background text-on-surface font-body-md min-h-screen">
       {/* Quick Stats Organic Section */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-lg mb-xl">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-lg mb-xl">
         <div className="organic-card rounded-xl p-lg flex items-center justify-between bg-white border border-outline-variant/30">
           <div>
             <p className="text-on-secondary-container text-label-sm font-bold uppercase tracking-widest text-xs">Clientes Totais</p>
@@ -131,17 +194,37 @@ export function ClientesPage() {
             <span className="material-symbols-outlined text-headline-md">bolt</span>
           </div>
         </div>
+        <div className="organic-card rounded-xl p-lg flex items-center justify-between bg-white border border-outline-variant/30">
+          <div>
+            <p className="text-on-secondary-container text-label-sm font-bold uppercase tracking-widest text-xs">Leads Pendentes</p>
+            <h2 className="text-display-lg font-display-lg text-error leading-none mt-xs text-3xl font-bold">{pendingLeads}</h2>
+          </div>
+          <div className="w-14 h-14 rounded-full bg-error-container/40 flex items-center justify-center text-error">
+            <span className="material-symbols-outlined text-headline-md">warning</span>
+          </div>
+        </div>
       </div>
 
       {/* Client Directory Section Header */}
       <div className="mb-lg flex items-center justify-between flex-wrap gap-md">
         <h3 className="font-display-lg text-2xl font-extrabold text-primary">Diretório de Clientes</h3>
-        <div className="flex items-center gap-md">
+        <div className="flex items-center gap-md flex-wrap">
+          <select
+            className="bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md focus:outline-none focus:border-primary text-body-md transition-all text-on-surface font-semibold"
+            value={selectedCompany}
+            onChange={(e) => setSelectedCompany(e.target.value)}
+          >
+            <option value="">Todas as Empresas</option>
+            {companies.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
           <div className="relative w-72">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline/60">search</span>
             <input
-              className="bg-surface-container-lowest border border-outline/20 rounded-xl py-sm pl-10 pr-md w-full focus:outline-none focus:border-primary text-body-md transition-all placeholder:text-outline/60 text-on-surface"
-              placeholder="Buscar clientes..."
+              className="bg-surface-container-lowest border border-outline/20 rounded-xl py-sm pl-10 pr-md w-full focus:outline-none focus:border-primary text-body-md transition-all text-on-surface"
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -162,32 +245,45 @@ export function ClientesPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-lg">
         {filteredItems.map((item) => {
           const revNum = Number(item.total_acumulado || 0)
+          const isPending = getClientStatus(item) === 'PENDING'
 
           return (
-            <div className="organic-card rounded-xl p-lg group cursor-pointer transition-all bg-white" key={item.id}>
-              <div className="flex justify-between items-start mb-lg">
-                <div className="w-12 h-12 rounded-xl bg-surface-container-low overflow-hidden p-xs flex items-center justify-center border border-outline/10 text-primary font-extrabold text-lg">
-                  {initials(item.nome)}
+            <div className="organic-card rounded-xl p-lg group cursor-pointer transition-all bg-white flex flex-col justify-between" key={item.id}>
+              <div>
+                <div className="flex justify-between items-start mb-lg">
+                  <div className="w-12 h-12 rounded-xl bg-surface-container-low overflow-hidden p-xs flex items-center justify-center border border-outline/10 text-primary font-extrabold text-lg">
+                    {initials(item.nome)}
+                  </div>
+                  <div className="flex flex-col items-end gap-xs">
+                    <div className="bg-secondary-container px-sm py-1 rounded-full border border-outline/10 shadow-sm">
+                      <span className="text-on-secondary-container font-label-sm font-semibold text-xs">
+                        {revNum > 10000 ? 'Contrato Recorrente' : revNum > 0 ? 'Em Progresso' : 'Fase de Lead'}
+                      </span>
+                    </div>
+                    {isPending && (
+                      <div className="bg-error-container/40 border border-error text-error px-sm py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
+                        <span className="material-symbols-outlined text-[12px] font-bold">warning</span>
+                        <span className="font-label-sm font-bold text-[10px]">Aviso: Pendente</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="bg-secondary-container px-sm py-1 rounded-full border border-outline/10 shadow-sm">
-                  <span className="text-on-secondary-container font-label-sm font-semibold text-xs">
-                    {revNum > 10000 ? 'Contrato Recorrente' : revNum > 0 ? 'Em Progresso' : 'Fase de Lead'}
-                  </span>
+                <h4 className="font-display-lg text-headline-md text-primary mb-xs font-bold text-lg">
+                  <Link to={`/clientes/${item.id}`} className="hover:underline">{item.nome}</Link>
+                </h4>
+                {item.empresa && (
+                  <p className="text-xs text-outline/80 mb-sm flex items-center gap-1 font-semibold">
+                    <span className="material-symbols-outlined text-[14px]">domain</span>
+                    {item.empresa}
+                  </p>
+                )}
+                <p className="text-on-secondary-container font-body-md mb-lg text-sm">{item.email || 'Sem E-mail'} • {item.telefone || 'Sem Telefone'}</p>
+                <div className="pt-2 pb-2 mb-lg flex justify-between items-center border-t border-b border-outline/5">
+                  <span className="text-on-surface-variant text-sm opacity-70">Receita Acumulada</span>
+                  <span className="text-primary font-mono-data text-body-lg font-bold text-lg">{formatCurrency(item.total_acumulado)}</span>
                 </div>
               </div>
-              <h4 className="font-display-lg text-headline-md text-primary mb-xs font-bold text-lg">
-                <Link to={`/clientes/${item.id}`} className="hover:underline">{item.nome}</Link>
-              </h4>
-              <p className="text-on-secondary-container font-body-md mb-lg text-sm">{item.email || 'Sem E-mail'} • {item.telefone || 'Sem Telefone'}</p>
-              <div className="pt-2 pb-2 mb-lg flex justify-between items-center border-t border-b border-outline/5">
-                <span className="text-on-surface-variant text-sm opacity-70">Receita Acumulada</span>
-                <span className="text-primary font-mono-data text-body-lg font-bold text-lg">{formatCurrency(item.total_acumulado)}</span>
-              </div>
-              <div className="pt-md border-t border-outline/10 flex items-center justify-between">
-                <div className="flex items-center gap-xs">
-                  <span className="material-symbols-outlined text-primary text-body-md">sync</span>
-                  <span className="text-on-secondary-container font-label-sm">Ficha do Cliente</span>
-                </div>
+              <div className="pt-md border-t border-outline/10 flex items-center justify-end">
                 <div className="flex gap-sm">
                   <Link to={`/clientes/${item.id}`} className="text-primary font-bold text-sm hover:underline">Ver</Link>
                   <button onClick={() => void onDelete(item.id)} className="text-error font-bold text-sm hover:underline">Excluir</button>
@@ -208,6 +304,7 @@ export function ClientesPage() {
             <thead>
               <tr className="text-label-sm text-on-secondary-container opacity-80 border-b border-outline/10 bg-surface-container-low">
                 <th className="px-lg py-md font-semibold">Cliente</th>
+                <th className="px-lg py-md font-semibold">Empresa</th>
                 <th className="px-lg py-md font-semibold">E-mail</th>
                 <th className="px-lg py-md font-semibold">Telefone</th>
                 <th className="px-lg py-md font-semibold">Faturamento</th>
@@ -223,6 +320,7 @@ export function ClientesPage() {
                     </div>
                     <span className="font-medium">{item.nome}</span>
                   </td>
+                  <td className="px-lg py-lg text-on-surface-variant font-semibold text-xs">{item.empresa || 'Não informada'}</td>
                   <td className="px-lg py-lg">{item.email || '-'}</td>
                   <td className="px-lg py-lg">{item.telefone || '-'}</td>
                   <td className="px-lg py-lg text-primary font-mono-data font-semibold">{formatCurrency(item.total_acumulado)}</td>
@@ -259,20 +357,26 @@ export function ClientesPage() {
 
             <form className="form-grid" onSubmit={onSubmit} style={{ gridTemplateColumns: '1fr', gap: '14px' }}>
               <label className="block text-sm font-semibold text-outline">
-                Nome do Cliente / Empresa
+                Nome do Cliente
                 <input
                   required
-                  placeholder="Ex: Acme Corp"
                   className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
                   value={form.nome}
                   onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
                 />
               </label>
               <label className="block text-sm font-semibold text-outline">
+                Empresa / Organização (Opcional)
+                <input
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
+                  value={form.empresa}
+                  onChange={(e) => setForm((prev) => ({ ...prev, empresa: e.target.value }))}
+                />
+              </label>
+              <label className="block text-sm font-semibold text-outline">
                 Endereço de E-mail
                 <input
                   type="email"
-                  placeholder="Ex: contato@acme.com"
                   className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
                   value={form.email}
                   onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
@@ -284,7 +388,6 @@ export function ClientesPage() {
                   <input
                     inputMode="numeric"
                     maxLength={2}
-                    placeholder="11"
                     className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
                     value={form.ddd}
                     onChange={(e) =>
@@ -297,7 +400,6 @@ export function ClientesPage() {
                   <input
                     inputMode="numeric"
                     maxLength={9}
-                    placeholder="987654321"
                     className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none focus:ring-0 text-on-surface"
                     value={form.telefone_numero}
                     onChange={(e) =>

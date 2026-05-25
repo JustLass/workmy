@@ -16,6 +16,7 @@ class ClienteInSchema(Schema):
     model_config = ConfigDict()
     
     nome: str = Field(..., min_length=1, max_length=100, description="Nome do cliente", title="Nome")
+    empresa: Optional[str] = Field(None, max_length=100, description="Empresa do cliente (opcional)", title="Empresa")
     email: Optional[str] = Field(None, max_length=254, description="Email do cliente (opcional)", title="Email")
     telefone: Optional[str] = Field(None, max_length=20, description="Telefone do cliente (opcional)", title="Telefone")
 
@@ -57,6 +58,7 @@ class ClienteOutSchema(Schema):
     """Schema de resposta com dados do cliente"""
     id: int = Field(..., description="ID único do cliente")
     nome: str = Field(..., description="Nome do cliente")
+    empresa: str = Field("Não informada", description="Nome da empresa do cliente")
     email: Optional[str] = Field(None, description="Email do cliente")
     telefone: Optional[str] = Field(None, description="Telefone do cliente")
     total_acumulado: str = Field(..., description="Total acumulado em pagamentos do cliente")
@@ -195,6 +197,14 @@ class ServicoDetailOutSchema(Schema):
 
 
 # ============ SCHEMAS DE ERRO ============
+
+class VincularClientesMassaInSchema(Schema):
+    """Schema para vincular múltiplos clientes a um serviço em massa"""
+    cliente_ids: List[int] = Field(..., description="Lista de IDs de clientes")
+    tipo_recorrencia: str = Field("AVULSO", description="Tipo de recorrência: MENSAL, AVULSO")
+    valor: Optional[Decimal] = Field(None, description="Valor dos contratos gerados")
+    dia_vencimento: int = Field(5, description="Dia de vencimento das parcelas (1-28)")
+
 
 class ErrorSchema(Schema):
     """Schema de resposta de erro"""
