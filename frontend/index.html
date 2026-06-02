@@ -14,53 +14,62 @@
             theme: {
                 extend: {
                     "colors": {
-                        "on-secondary-container": "#546959",
-                        "surface-tint": "#496455",
-                        "on-primary-container": "#98b5a3",
-                        "error": "#ba1a1a",
-                        "primary-container": "#2d4739",
-                        "surface-bright": "#fbfbe2",
-                        "on-tertiary-fixed-variant": "#424a28",
-                        "on-secondary-fixed-variant": "#374b3c",
-                        "surface-dim": "#dbdcc3",
-                        "surface-container-lowest": "#ffffff",
-                        "on-error": "#ffffff",
-                        "primary-fixed": "#ccead6",
-                        "secondary-fixed-dim": "#b5ccb8",
-                        "inverse-on-surface": "#f2f2d9",
-                        "secondary": "#4e6353",
-                        "on-surface-variant": "#424844",
-                        "surface": "#fbfbe2",
-                        "tertiary-fixed": "#dde7b9",
-                        "surface-container-highest": "#e4e4cc",
-                        "outline": "#727973",
-                        "tertiary": "#262e0f",
-                        "inverse-surface": "#303221",
-                        "surface-variant": "#e4e4cc",
-                        "inverse-primary": "#b0cdbb",
-                        "tertiary-fixed-dim": "#c1cb9f",
+                        // ── WorkMy Design System v3 — "Indigo / Slate / Emerald" ──
+                        // Paleta harmônica de alto contraste (WCAG AA/AAA verificado).
+                        // primary  = Indigo (marca/ações)   tertiary = Emerald (valores/positivo)
+                        // secondary = Slate (apoio/labels)   neutros  = cinza-frio limpo
+                        "primary": "#4338ca",
                         "on-primary": "#ffffff",
-                        "surface-container-high": "#eaead1",
-                        "on-primary-fixed": "#062014",
-                        "background": "#fbfbe2",
-                        "on-surface": "#1b1d0e",
-                        "error-container": "#ffdad6",
-                        "primary": "#173124",
-                        "on-error-container": "#93000a",
-                        "secondary-fixed": "#d1e9d4",
-                        "surface-container": "#efefd7",
-                        "on-background": "#1b1d0e",
+                        "primary-container": "#e0e7ff",
+                        "on-primary-container": "#312e81",
+                        "primary-fixed": "#e0e7ff",
+                        "primary-fixed-dim": "#c7d2fe",
+                        "on-primary-fixed": "#1e1b4b",
+                        "on-primary-fixed-variant": "#3730a3",
+                        "inverse-primary": "#c7d2fe",
+                        "surface-tint": "#4338ca",
+
+                        "secondary": "#4f5b76",
                         "on-secondary": "#ffffff",
+                        "secondary-container": "#dee3f0",
+                        "on-secondary-container": "#2a3550",
+                        "secondary-fixed": "#dee3f0",
+                        "secondary-fixed-dim": "#bfc8de",
+                        "on-secondary-fixed": "#2a3550",
+                        "on-secondary-fixed-variant": "#3a4360",
+
+                        "tertiary": "#0e7c66",
                         "on-tertiary": "#ffffff",
-                        "on-tertiary-fixed": "#171e03",
-                        "primary-fixed-dim": "#b0cdbb",
-                        "tertiary-container": "#3c4523",
-                        "secondary-container": "#d1e9d4",
-                        "on-primary-fixed-variant": "#324c3e",
-                        "outline-variant": "#c2c8c2",
-                        "on-secondary-fixed": "#0c1f13",
-                        "on-tertiary-container": "#a8b287",
-                        "surface-container-low": "#f5f5dc"
+                        "tertiary-container": "#cff5e7",
+                        "on-tertiary-container": "#0a4a3c",
+                        "tertiary-fixed": "#cff5e7",
+                        "tertiary-fixed-dim": "#a3e6cf",
+                        "on-tertiary-fixed": "#0a4a3c",
+                        "on-tertiary-fixed-variant": "#0a4a3c",
+
+                        "error": "#c0182b",
+                        "on-error": "#ffffff",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#8c0009",
+
+                        "background": "#f6f7f9",
+                        "on-background": "#1b1f2a",
+                        "surface": "#ffffff",
+                        "on-surface": "#1b1f2a",
+                        "on-surface-variant": "#444b5a",
+                        "surface-variant": "#e3e7ee",
+                        "surface-dim": "#d6dbe4",
+                        "surface-bright": "#ffffff",
+                        "surface-container-lowest": "#ffffff",
+                        "surface-container-low": "#f1f3f6",
+                        "surface-container": "#eaedf2",
+                        "surface-container-high": "#e3e7ee",
+                        "surface-container-highest": "#dce1ea",
+
+                        "outline": "#737b8c",
+                        "outline-variant": "#c5ccd8",
+                        "inverse-surface": "#2d3340",
+                        "inverse-on-surface": "#f1f3f6"
                     },
                     "borderRadius": {
                         "DEFAULT": "0.25rem",
@@ -101,30 +110,32 @@
         }
     </script>
     <style>
+        /* Helpers de superfície — tints neutros frios (slate), alinhados à paleta v3 */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.4);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(73, 100, 85, 0.1);
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(67, 56, 202, 0.08);
         }
         .organic-panel {
-            background: #f5f5dc;
-            border: 1px solid #c2c8c2;
+            background: #f1f3f6;
+            border: 1px solid #c5ccd8;
         }
         .organic-card {
             background: #ffffff;
-            border: 1px solid rgba(114, 121, 115, 0.1);
-            box-shadow: 0 4px 20px -4px rgba(73, 100, 85, 0.08);
+            border: 1px solid rgba(27, 31, 42, 0.07);
+            box-shadow: 0 4px 20px -6px rgba(30, 35, 56, 0.08);
             transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
         .organic-card:hover {
-            box-shadow: 0 10px 30px -4px rgba(73, 100, 85, 0.12);
+            box-shadow: 0 14px 34px -10px rgba(67, 56, 202, 0.14);
             transform: translateY(-2px);
         }
         .soft-shadow-green {
-            box-shadow: 0 10px 30px -10px rgba(73, 100, 85, 0.12);
+            box-shadow: 0 12px 30px -12px rgba(67, 56, 202, 0.18);
         }
         .card-shadow {
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 4px 6px -1px rgba(27, 31, 42, 0.05), 0 2px 4px -1px rgba(27, 31, 42, 0.03);
         }
     </style>
   </head>

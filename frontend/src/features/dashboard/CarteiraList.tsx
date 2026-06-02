@@ -144,34 +144,44 @@ export function CarteiraList({ projetos, pagamentos, onRefresh }: CarteiraListPr
   }
 
   return (
-    <div className="carteira-list">
+    <div className="flex flex-col gap-3">
       {error && <p className="error">{error}</p>}
       {rows.map(({ projeto, pagamento }) => (
-        <article key={projeto.id} className="carteira-card">
-          <div className="carteira-card-top">
-            <div className="carteira-avatar" aria-hidden>
+        <article
+          key={projeto.id}
+          className="bg-surface border border-outline-variant/60 rounded-2xl p-4 sm:p-5 shadow-sm hover:shadow-md hover:border-primary/30 transition-all duration-200 flex flex-col gap-3.5"
+        >
+          <div className="flex items-center gap-3.5">
+            <div
+              className="h-11 w-11 rounded-full bg-primary-container text-on-primary-container font-bold text-sm grid place-items-center shrink-0 font-display-lg"
+              aria-hidden
+            >
               {initials(projeto.cliente_nome)}
             </div>
-            <div className="carteira-info">
-              <h4>{projeto.cliente_nome}</h4>
-              <p>{projeto.servico_nome}</p>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-semibold text-on-surface truncate m-0">{projeto.cliente_nome}</h4>
+              <p className="text-sm text-on-surface-variant mt-0.5 m-0">{projeto.servico_nome}</p>
             </div>
-            <Link to={`/clientes/${projeto.cliente_id}`} className="carteira-link">
+            <Link
+              to={`/clientes/${projeto.cliente_id}`}
+              className="text-sm font-semibold text-primary hover:text-on-primary-fixed-variant shrink-0 no-underline"
+            >
               Abrir
             </Link>
           </div>
 
-          <div className="carteira-bottom">
-            <label className="mensalista-toggle">
+          <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-outline-variant/40">
+            <label className="flex flex-wrap items-center gap-2.5 text-sm font-medium text-on-surface cursor-pointer select-none">
               <input
                 type="checkbox"
+                className="h-[18px] w-[18px] rounded accent-primary cursor-pointer"
                 checked={projeto.mensalista}
                 disabled={togglingId === projeto.id}
                 onChange={(e) => void toggleMensalista(projeto, pagamento, e.target.checked)}
               />
               <span>Plano mensal</span>
               {projeto.mensalista && (
-                <span className="muted" style={{ fontSize: 12 }}>
+                <span className="text-xs text-tertiary font-medium">
                   cobranças automáticas ativas
                 </span>
               )}
@@ -179,11 +189,21 @@ export function CarteiraList({ projetos, pagamentos, onRefresh }: CarteiraListPr
 
             {pagamento ? (
               <>
-                <div className="carteira-valor-wrap">
-                  <label htmlFor={`valor-${projeto.id}`}>Valor</label>
+                <div className="flex items-center gap-2">
+                  <label
+                    htmlFor={`valor-${projeto.id}`}
+                    className="text-xs text-on-surface-variant font-medium"
+                  >
+                    Valor
+                  </label>
                   <input
                     id={`valor-${projeto.id}`}
-                    className={cn('carteira-valor-input', savedId === pagamento.id && 'saved')}
+                    className={cn(
+                      'w-36 font-semibold text-on-surface bg-surface-container-low border rounded-xl px-3 py-2 transition-all focus:outline-none focus:ring-2',
+                      savedId === pagamento.id
+                        ? 'border-tertiary ring-2 ring-tertiary/40'
+                        : 'border-outline-variant focus:ring-primary/30 focus:border-primary',
+                    )}
                     type="text"
                     inputMode="decimal"
                     defaultValue={pagamento.valor.replace('.', ',')}
@@ -201,16 +221,21 @@ export function CarteiraList({ projetos, pagamentos, onRefresh }: CarteiraListPr
                     }}
                   />
                 </div>
-                <div className="carteira-meta">
+                <div className="flex flex-wrap gap-2 ml-auto">
                   <Badge variant={badgeVariant(pagamento.tipo_pagamento)}>
                     {tipoLabel(pagamento.tipo_pagamento)}
                   </Badge>
                 </div>
               </>
             ) : (
-              <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+              <p className="text-sm text-on-surface-variant m-0">
                 Sem pagamento registrado —{' '}
-                <Link to={`/clientes/${projeto.cliente_id}`}>adicionar na ficha do cliente</Link>
+                <Link
+                  to={`/clientes/${projeto.cliente_id}`}
+                  className="text-primary font-medium no-underline hover:underline"
+                >
+                  adicionar na ficha do cliente
+                </Link>
               </p>
             )}
           </div>

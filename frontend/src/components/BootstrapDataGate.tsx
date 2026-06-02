@@ -41,14 +41,17 @@ export function BootstrapDataGate({ children }: { children: ReactNode }) {
 
   if (shouldBootstrap) {
     return (
-      <div className="center-page">
-        <div className="boot-loader">
+      <div className="min-h-screen grid place-items-center bg-background px-6">
+        <div className="grid gap-4 justify-items-center text-center">
           <div className="spinner" aria-hidden="true" />
-          <p>Carregando clientes e serviços...</p>
+          <p className="text-on-surface-variant m-0">Carregando clientes e serviços...</p>
           {error && (
-            <button type="button" className="btn" onClick={() => setRetryToken((prev) => prev + 1)}>
-              Tentar novamente
-            </button>
+            <>
+              <p className="error">{error}</p>
+              <button type="button" className="btn" onClick={() => setRetryToken((prev) => prev + 1)}>
+                Tentar novamente
+              </button>
+            </>
           )}
         </div>
       </div>

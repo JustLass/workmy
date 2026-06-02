@@ -66,8 +66,8 @@ export function AppLayout() {
             className={({ isActive }) =>
               `flex items-center gap-md px-md py-sm rounded-xl transition-all duration-200 ${
                 isActive
-                  ? 'text-primary font-bold bg-primary-fixed/40'
-                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/20'
+                  ? 'text-on-primary-container font-bold bg-primary-fixed/70'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/40'
               }`
             }
           >
@@ -80,8 +80,8 @@ export function AppLayout() {
             className={({ isActive }) =>
               `flex items-center gap-md px-md py-sm rounded-xl transition-all duration-200 ${
                 isActive
-                  ? 'text-primary font-bold bg-primary-fixed/40'
-                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/20'
+                  ? 'text-on-primary-container font-bold bg-primary-fixed/70'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/40'
               }`
             }
           >
@@ -94,8 +94,8 @@ export function AppLayout() {
             className={({ isActive }) =>
               `flex items-center gap-md px-md py-sm rounded-xl transition-all duration-200 ${
                 isActive
-                  ? 'text-primary font-bold bg-primary-fixed/40'
-                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/20'
+                  ? 'text-on-primary-container font-bold bg-primary-fixed/70'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/40'
               }`
             }
           >
@@ -108,8 +108,8 @@ export function AppLayout() {
             className={({ isActive }) =>
               `flex items-center gap-md px-md py-sm rounded-xl transition-all duration-200 ${
                 isActive
-                  ? 'text-primary font-bold bg-primary-fixed/40'
-                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/20'
+                  ? 'text-on-primary-container font-bold bg-primary-fixed/70'
+                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/40'
               }`
             }
           >
@@ -151,12 +151,14 @@ export function AppLayout() {
           </button>
         </div>
         <div className="flex items-center gap-md lg:gap-lg">
-          <div className="flex items-center gap-md group">
-            <div className="text-right hidden sm:block">
-              <p className="font-label-sm text-on-surface leading-tight font-bold">{user?.username || 'Usuário'}</p>
-              <p className="text-[10px] text-secondary font-bold uppercase tracking-tighter">{user?.email || 'Plano Premium'}</p>
+          <div className="flex items-center gap-sm">
+            <div className="text-right hidden sm:block leading-tight">
+              <p className="text-sm text-on-surface font-semibold m-0">{user?.username || 'Usuário'}</p>
+              {user?.email && (
+                <p className="text-xs text-on-surface-variant m-0 max-w-[180px] truncate">{user.email}</p>
+              )}
             </div>
-            <div className="h-10 w-10 rounded-full bg-primary/10 border-2 border-primary/20 text-primary font-bold flex items-center justify-center select-none shadow-sm shrink-0">
+            <div className="h-10 w-10 rounded-full bg-primary-container border border-primary/20 text-on-primary-container font-bold flex items-center justify-center select-none shrink-0">
               {getInitials(user?.username)}
             </div>
           </div>
