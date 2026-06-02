@@ -1,16 +1,17 @@
 import { createContext, useCallback, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { IS_DEMO_MODE } from '../config'
-import { demoRequest } from '../demo/demoApi'
-import { resetDemoStore } from '../demo/demoStore'
 import { http } from '../lib/http'
 import { clearApiCache } from '../shared/lib/cache'
-import type { TokenResponse, User } from '../types'
+import type { User } from '../types'
+
+// ---------------------------------------------------------------------------
+// C6 FIX: Os tokens JWT nunca são armazenados no frontend.
+// O BFF gerencia access/refresh tokens exclusivamente via HTTP-Only cookies.
+// O estado local guarda apenas dados PÚBLICOS do usuário (sem segredos).
+// ---------------------------------------------------------------------------
 
 type AuthContextData = {
   user: User | null
-  accessToken: string | null
-  refreshToken: string | null
   isAuthenticated: boolean
   loading: boolean
   login: (username: string, password: string) => Promise<void>
@@ -20,68 +21,52 @@ type AuthContextData = {
     password: string
     telefone?: string
   }) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextData | undefined>(undefined)
 export { AuthContext }
 
-const STORAGE_KEY = 'workmy_auth'
+// Chave usada para persistir apenas os dados públicos do usuário (sem tokens)
+const USER_STORAGE_KEY = 'workmy_user'
 
-type PersistedAuth = {
-  user: User
-  access: string
-  refresh: string
-}
+type PersistedUser = User
 
-function readPersistedAuth(): PersistedAuth | null {
-  const raw = localStorage.getItem(STORAGE_KEY)
+function readPersistedUser(): PersistedUser | null {
+  const raw = localStorage.getItem(USER_STORAGE_KEY)
   if (!raw) return null
   try {
-    return JSON.parse(raw) as PersistedAuth
+    return JSON.parse(raw) as PersistedUser
   } catch {
     return null
   }
 }
 
+// Resposta do BFF após login/register — contém apenas dados públicos
+type BffAuthResponse = {
+  user: User
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const persisted = readPersistedAuth()
-  const [user, setUser] = useState<User | null>(persisted?.user ?? null)
-  const [accessToken, setAccessToken] = useState<string | null>(persisted?.access ?? null)
-  const [refreshToken, setRefreshToken] = useState<string | null>(persisted?.refresh ?? null)
+  const [user, setUser] = useState<User | null>(readPersistedUser())
   const loading = false
 
-  const persist = useCallback((payload: TokenResponse) => {
-    // Purga todo e qualquer cache local da API de sessões ou bancos antigos ao autenticar
+  const persistUser = useCallback((userData: User) => {
     clearApiCache()
-    setUser(payload.user)
-    setAccessToken(payload.access)
-    setRefreshToken(payload.refresh)
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        user: payload.user,
-        access: payload.access,
-        refresh: payload.refresh,
-      }),
-    )
+    setUser(userData)
+    // Armazena apenas dados públicos (nome, email, id) — sem tokens
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userData))
   }, [])
 
   const login = useCallback(async (username: string, password: string) => {
-    if (IS_DEMO_MODE) {
-      const payload = await demoRequest<TokenResponse>('/auth/login', {
-        method: 'POST',
-        body: { username, password: password || 'demo' },
-      })
-      persist(payload)
-      return
-    }
-    const payload = await http<TokenResponse>('/auth/login', {
+    // O BFF recebe as credenciais, valida com FastAPI e seta os HTTP-Only cookies.
+    // A resposta retorna apenas dados públicos do usuário.
+    const payload = await http<BffAuthResponse>('/auth/login', {
       method: 'POST',
       body: { username, password },
     })
-    persist(payload)
-  }, [persist])
+    persistUser(payload.user)
+  }, [persistUser])
 
   const register = useCallback(async (payload: {
     username: string
@@ -89,42 +74,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string
     telefone?: string
   }) => {
-    if (IS_DEMO_MODE) {
-      const response = await demoRequest<TokenResponse>('/auth/register', {
-        method: 'POST',
-        body: payload,
-      })
-      persist(response)
-      return
-    }
-    const response = await http<TokenResponse>('/auth/register', {
+    const response = await http<BffAuthResponse>('/auth/register', {
       method: 'POST',
       body: payload,
     })
-    persist(response)
-  }, [persist])
+    persistUser(response.user)
+  }, [persistUser])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    try {
+      // Notifica o BFF para limpar os cookies HTTP-Only E revogar o JTI no FastAPI
+      await http<{ message: string }>('/auth/logout', { method: 'POST' })
+    } catch {
+      // Mesmo que falhe, limpa o estado local
+    }
     setUser(null)
-    setAccessToken(null)
-    setRefreshToken(null)
-    localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem(USER_STORAGE_KEY)
     clearApiCache()
-    if (IS_DEMO_MODE) resetDemoStore()
   }, [])
 
   const value = useMemo<AuthContextData>(
     () => ({
       user,
-      accessToken,
-      refreshToken,
-      isAuthenticated: Boolean(user && accessToken),
+      isAuthenticated: Boolean(user),
       loading,
       login,
       register,
       logout,
     }),
-    [user, accessToken, refreshToken, loading, login, register, logout],
+    [user, loading, login, register, logout],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

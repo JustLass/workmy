@@ -5,11 +5,7 @@ export type User = {
   telefone?: string | null
 }
 
-export type TokenResponse = {
-  access: string
-  refresh: string
-  user: User
-}
+// TokenResponse removido — com cookie-only auth o BFF retorna apenas { user }
 
 export type Cliente = {
   id: number
@@ -45,7 +41,8 @@ export type Projeto = {
   criado_em: string
   status: 'DISCOVERY' | 'IN_PROGRESS' | 'REVIEW' | 'COMPLETED'
   progresso: number
-  tipo_recorrencia: 'MENSAL' | 'QUINZENAL' | 'AVULSO'
+  tipo_recorrencia: 'MENSAL' | 'AVULSO'
+  valor: string | null
   ativo: boolean
   total_acumulado: string
 }
@@ -64,7 +61,7 @@ export type Pagamento = {
   projeto_cliente_nome: string
   projeto_servico_nome: string
   valor: string
-  tipo_pagamento: 'MENSAL' | 'AVULSO' | 'QUINZENAL'
+  tipo_pagamento: 'MENSAL' | 'AVULSO'
   tipo_pagamento_display: string
   data: string
   observacao?: string | null

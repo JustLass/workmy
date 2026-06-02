@@ -8,7 +8,6 @@ import { ClientesPage } from './pages/ClientesPage.tsx'
 import { ServicosPage } from './pages/ServicosPage.tsx'
 import { ClienteDetailPage } from './pages/ClienteDetailPage.tsx'
 import { ServicoDetailPage } from './pages/ServicoDetailPage.tsx'
-import { PagamentosPage } from './pages/PagamentosPage.tsx'
 import { ProjetosPage } from './pages/ProjetosPage.tsx'
 
 function App() {
@@ -34,7 +33,7 @@ function App() {
         <Route path="servicos" element={<ServicosPage />} />
         <Route path="servicos/:id" element={<ServicoDetailPage />} />
 
-        <Route path="pagamentos" element={<PagamentosPage />} />
+        <Route path="pagamentos" element={<Navigate to="/dashboard" replace />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

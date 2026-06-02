@@ -5,18 +5,20 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Outfit', sans-serif;
 
-  /* Brand / Moss Forest Green Accent */
-  --brand-50: #f4f7f5;
-  --brand-100: #e2ede6;
-  --brand-200: #c5dbce;
-  --brand-500: #2d5a3f; /* Moss / Forest Green */
-  --brand-600: #234731;
-  --brand-700: #193323;
+  /* Brand / Moss Forest Green Accent (Dynamic HSL System) */
+  --hue-primary: 145; /* 145 = Moss Green (Default), 250 = Indigo, 200 = Sky Blue, 30 = Amber */
+  
+  --brand-50: hsl(var(--hue-primary), 15%, 97%);
+  --brand-100: hsl(var(--hue-primary), 20%, 92%);
+  --brand-200: hsl(var(--hue-primary), 25%, 82%);
+  --brand-500: hsl(var(--hue-primary), 45%, 35%); /* Primary brand accent */
+  --brand-600: hsl(var(--hue-primary), 50%, 25%);
+  --brand-700: hsl(var(--hue-primary), 55%, 18%);
 
   /* Surfaces - Warm Sand Beige & Organic Cream */
   --bg-main: #fbfaf6; /* Cream Sand Beige */
   --bg-card: rgba(255, 255, 255, 0.72); /* Translucent glass */
-  --bg-soft: rgba(45, 90, 63, 0.05); /* Soft beige-green tint */
+  --bg-soft: hsla(var(--hue-primary), 45%, 35%, 0.05); /* Soft dynamic brand tint */
   --bg-elevated: #ffffff;
   --bg-sidebar: rgba(247, 245, 237, 0.85); /* Sand beige glass sidebar */
 

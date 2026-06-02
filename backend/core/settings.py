@@ -214,6 +214,7 @@ if ON_RENDER:
     if not CSRF_TRUSTED_ORIGINS and CORS_ALLOWED_ORIGINS:
         CSRF_TRUSTED_ORIGINS = _csrf_from_cors_and_hosts(CORS_ALLOWED_ORIGINS, _allowed_hosts_env)
 else:
+    CORS_ALLOW_ALL_ORIGINS = True
     CORS_ALLOWED_ORIGINS = _split_env_list('CORS_ALLOWED_ORIGINS', _DEV_CORS)
     CSRF_TRUSTED_ORIGINS = _split_env_list('CSRF_TRUSTED_ORIGINS', _DEV_CORS)
 

@@ -1,0 +1,41 @@
+import os
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.orm import DeclarativeBase
+
+# URL padrão para SQLite assíncrono caso nenhuma variável esteja configurada
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./db.sqlite3")
+
+# Configura a Engine do SQLAlchemy assíncrona
+# Desativa pooling de threads para SQLite simples para evitar colisões de threads de testes
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    connect_args=connect_args
+)
+
+# Fabrica sessões assíncronas do banco
+async_session_maker = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+    autocommit=False,
+    autoflush=False
+)
+
+# Classe Base declarativa para os modelos físicos do ORM
+class Base(DeclarativeBase):
+    pass
+
+# Dependency local para rotas do FastAPI obterem sessão do banco
+async def get_db_session():
+    async with async_session_maker() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
+        finally:
+            await session.close()

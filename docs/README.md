@@ -19,52 +19,52 @@ Usuario (AbstractUser)
 ```
 
 ### 1. Usuario (`usuarios.Usuario`)
-Modelo estendido do Django `AbstractUser` que implementa autenticação via JWT:
-- `email`: `EmailField` (único)
-- `telefone`: `CharField(max_length=20, null=True, blank=True)`
+Modelo SQLAlchemy que representa o usuário do sistema:
+- `email`: `String` (único)
+- `telefone`: `String`
 
 ### 2. Cliente (`gestao_freelas.Cliente`)
 Cadastro comercial de clientes pertencentes ao usuário:
-- `usuario`: `ForeignKey(Usuario)`
-- `nome`: `CharField(max_length=100)`
-- `email`: `EmailField(null=True, blank=True)`
-- `telefone`: `CharField(max_length=20, null=True, blank=True)`
+- `usuario_id`: `Integer` (ForeignKey)
+- `nome`: `String(100)`
+- `email`: `String`
+- `telefone`: `String(20)`
 
 ### 3. Servico (`gestao_freelas.Servico`)
 Catálogo de serviços oferecidos com suporte a tags e banner de mídia:
-- `usuario`: `ForeignKey(Usuario)`
-- `nome`: `CharField(max_length=150)`
-- `descricao`: `TextField(max_length=500)`
-- `tags`: `CharField(max_length=250)` (separadas por vírgula para filtros rápidos)
-- `ferramentas`: `CharField(max_length=250)` (tecnologias utilizadas)
-- `github_repo`: `URLField`
-- `imagem_bytes`: `BinaryField` (dados da capa do serviço em Base64)
-- `imagem_mime`: `CharField(max_length=50)` (Tipo MIME da capa)
+- `usuario_id`: `Integer` (ForeignKey)
+- `nome`: `String(150)`
+- `descricao`: `Text`
+- `tags`: `String(250)` (separadas por vírgula para filtros rápidos)
+- `ferramentas`: `String(250)` (tecnologias utilizadas)
+- `github_repo`: `String`
+- `imagem_bytes`: `LargeBinary` (dados da capa do serviço em Base64)
+- `imagem_mime`: `String(50)` (Tipo MIME da capa)
 
 ### 4. Projeto (`gestao_freelas.Projeto`)
 Representa um contrato/vínculo entre cliente e serviço:
-- `usuario`: `ForeignKey(Usuario)`
-- `cliente`: `ForeignKey(Cliente)`
-- `servico`: `ForeignKey(Servico)`
-- `status`: `CharField` (`DISCOVERY`, `IN_PROGRESS`, `REVIEW`, `COMPLETED`)
-- `recorrencia_ativa`: `BooleanField` (Indica se a cobrança recorrente está habilitada)
-- `tipo_recorrencia`: `CharField` (`MENSAL`, `AVULSO`)
-- `valor_mensal`: `DecimalField` (Valor de cobrança mensal automatizada)
-- `dia_vencimento`: `PositiveSmallIntegerField` (Dia do mês de cobrança, entre 1-28)
-- `recorrencia_inicio`: `DateField` (Data de início do plano)
-- `mensalista`: `BooleanField` (Marcado automaticamente pelo sistema se há mensalidade configurada e ativa)
+- `usuario_id`: `Integer`
+- `cliente_id`: `Integer`
+- `servico_id`: `Integer`
+- `status`: `String` (`DISCOVERY`, `IN_PROGRESS`, `REVIEW`, `COMPLETED`)
+- `recorrencia_ativa`: `Boolean` (Indica se a cobrança recorrente está habilitada)
+- `tipo_recorrencia`: `String` (`MENSAL`, `AVULSO`)
+- `valor_mensal`: `Numeric` (Valor de cobrança mensal automatizada)
+- `dia_vencimento`: `Integer` (Dia do mês de cobrança, entre 1-28)
+- `recorrencia_inicio`: `Date` (Data de início do plano)
+- `mensalista`: `Boolean` (Marcado automaticamente pelo sistema se há mensalidade configurada e ativa)
 
 ### 5. Pagamento (`gestao_freelas.Pagamento`)
 Lançamentos financeiros de receitas associados a um Projeto:
-- `projeto`: `ForeignKey(Projeto)`
-- `valor`: `DecimalField`
-- `tipo_pagamento`: `CharField` (`MENSAL` para mensalidades geradas e `AVULSO` para extras/manuais)
-- `data`: `DateField` (Data do recebimento ou vencimento)
-- `referencia_mes`: `CharField` (Identificador temporal `YYYY-MM` para garantir a idempotência da recorrência)
-- `gerado_automaticamente`: `BooleanField`
-- `comprovante_bytes`: `BinaryField` (dados da imagem do comprovante anexado)
-- `comprovante_mime`: `CharField(max_length=50)`
-- `deletado_em`: `DateTimeField` (soft delete)
+- `projeto_id`: `Integer`
+- `valor`: `Numeric`
+- `tipo_pagamento`: `String` (`MENSAL` para mensalidades geradas e `AVULSO` para extras/manuais)
+- `data`: `Date` (Data do recebimento ou vencimento)
+- `referencia_mes`: `String` (Identificador temporal `YYYY-MM` para garantir a idempotência da recorrência)
+- `gerado_automaticamente`: `Boolean`
+- `comprovante_bytes`: `LargeBinary` (dados da imagem do comprovante anexado)
+- `comprovante_mime`: `String(50)`
+- `deletado_em`: `DateTime` (soft delete)
 
 ---
 
@@ -90,9 +90,9 @@ O fluxo financeiro do WorkMy foi projetado sob duas premissas fundamentais: **se
 
 ---
 
-## 🔌 API Endpoints (Base URL: `/api/v1`)
+## 🔌 API Endpoints (Base URL: `/api`)
 
-Todos os endpoints (exceto os de registro e login) exigem cabeçalho de autenticação JWT: `Authorization: Bearer <access_token>`.
+Todos os endpoints da API FastAPI (exceto os de registro e login via Node.js BFF) exigem cabeçalho de autenticação JWT: `Authorization: Bearer <access_token>`. O BFF cuida de incluir esse cabeçalho extraindo do Cookie nas rotas originadas do navegador.
 
 ### 1. Autenticação (`/auth`)
 - `POST /auth/register` - Cria uma nova conta de usuário.
@@ -142,8 +142,10 @@ Toda ação de mutação de dados (`CREATE`, `UPDATE`, `DELETE`) nos modelos pri
 ---
 
 ## 🧪 Estrutura de Testes Automatizados
-O backend possui suíte de testes robusta em Django TestCase (`gestao_freelas/tests.py`).
+O backend possui suíte de testes unitários e de integração robusta em Pytest. O padrão abrange testes In-Memory (mocks) e testes End-to-End da API FastAPI.
 Para executar as validações locais:
 ```bash
-python manage.py test
+cd backend-fastapi
+uv sync
+.\.venv\Scripts\pytest
 ```

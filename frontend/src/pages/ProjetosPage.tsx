@@ -25,6 +25,7 @@ export function ProjetosPage() {
     progresso: 0,
     tipo_recorrencia: 'AVULSO',
     ativo: true,
+    valor: '',
   })
 
   // Modal / Editing states
@@ -34,6 +35,7 @@ export function ProjetosPage() {
     progresso: 0,
     tipo_recorrencia: 'AVULSO',
     ativo: true,
+    valor: '',
   })
 
   const load = useCallback(async () => {
@@ -70,6 +72,7 @@ export function ProjetosPage() {
           progresso: Number(form.progresso),
           tipo_recorrencia: form.tipo_recorrencia,
           ativo: form.ativo,
+          valor: form.valor ? Number(form.valor) : null,
         },
       })
       setForm({
@@ -79,6 +82,7 @@ export function ProjetosPage() {
         progresso: 0,
         tipo_recorrencia: 'AVULSO',
         ativo: true,
+        valor: '',
       })
       setShowAddModal(false)
       await load()
@@ -122,6 +126,7 @@ export function ProjetosPage() {
       progresso: item.progresso,
       tipo_recorrencia: item.tipo_recorrencia,
       ativo: item.ativo,
+      valor: item.valor || '',
     })
   }
 
@@ -140,6 +145,7 @@ export function ProjetosPage() {
           progresso: Number(editForm.progresso),
           tipo_recorrencia: editForm.tipo_recorrencia,
           ativo: editForm.ativo,
+          valor: editForm.valor ? Number(editForm.valor) : null,
         },
       })
       setEditingItem(null)
@@ -393,6 +399,19 @@ export function ProjetosPage() {
                 Cobrança Recorrente Mensal
               </label>
 
+              <label className="block text-sm font-semibold text-outline mt-sm">
+                Valor do Contrato (R$, opcional)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Ex: 1500.00"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={form.valor}
+                  onChange={(e) => setForm((prev) => ({ ...prev, valor: e.target.value }))}
+                />
+              </label>
+
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
                 <button
                   type="button"
@@ -463,6 +482,19 @@ export function ProjetosPage() {
                   className="rounded border-outline/20 text-primary focus:ring-primary w-5 h-5"
                 />
                 Cobrança Recorrente Mensal
+              </label>
+
+              <label className="block text-sm font-semibold text-outline mt-sm">
+                Valor do Contrato (R$, opcional)
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="Ex: 1500.00"
+                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
+                  value={editForm.valor}
+                  onChange={(e) => setEditForm((prev) => ({ ...prev, valor: e.target.value }))}
+                />
               </label>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>

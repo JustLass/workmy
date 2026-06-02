@@ -1,0 +1,258 @@
+import pytest
+from decimal import Decimal
+from datetime import date
+from src.domain.entities.projeto import ProjetoEntity
+from src.domain.entities.cliente import ClienteEntity
+from src.domain.entities.servico import ServicoEntity
+from src.domain.entities.pagamento import PagamentoEntity
+from src.domain.exceptions.business_exceptions import ColisaoContratoException, ValidaEntidadeException
+from src.application.usecases.criar_projeto import CriarProjetoUseCase
+from src.application.usecases.faturar_recorrencias import FaturarRecorrenciasUseCase
+from src.application.ports.outbound.i_projeto_repository import IProjetoRepository
+from src.application.ports.outbound.i_cliente_repository import IClienteRepository
+from src.application.ports.outbound.i_servico_repository import IServicoRepository
+from src.application.ports.outbound.i_pagamento_repository import IPagamentoRepository
+from src.application.ports.outbound.i_event_publisher import IEventPublisher
+
+# --- MOCKS EM MEMÓRIA ---
+
+class InMemoryClienteRepository(IClienteRepository):
+    def __init__(self):
+        self.clientes = {}
+
+    async def get_by_id(self, id: int, usuario_id: int) -> ClienteEntity | None:
+        return self.clientes.get((id, usuario_id))
+
+    async def list_by_usuario(self, usuario_id: int) -> list[ClienteEntity]:
+        return [c for c in self.clientes.values() if c.usuario_id == usuario_id]
+
+    async def save(self, cliente: ClienteEntity) -> ClienteEntity:
+        if cliente.id is None:
+            cliente.id = len(self.clientes) + 1
+        self.clientes[(cliente.id, cliente.usuario_id)] = cliente
+        return cliente
+
+    async def exists_by_id(self, id: int, usuario_id: int) -> bool:
+        return (id, usuario_id) in self.clientes
+
+    async def exists_by_name(self, nome: str, usuario_id: int) -> bool:
+        return any(c.nome == nome and c.usuario_id == usuario_id for c in self.clientes.values())
+
+    async def count_projetos_ativos(self, cliente_id: int, usuario_id: int) -> int:
+        return 0
+
+    async def list_with_totals(self, usuario_id: int) -> list:
+        return []
+
+
+class InMemoryServicoRepository(IServicoRepository):
+    def __init__(self):
+        self.servicos = {}
+
+    async def get_by_id(self, id: int, usuario_id: int) -> ServicoEntity | None:
+        return self.servicos.get((id, usuario_id))
+
+    async def list_by_usuario(self, usuario_id: int) -> list[ServicoEntity]:
+        return [s for s in self.servicos.values() if s.usuario_id == usuario_id]
+
+    async def save(self, servico: ServicoEntity) -> ServicoEntity:
+        if servico.id is None:
+            servico.id = len(self.servicos) + 1
+        self.servicos[(servico.id, servico.usuario_id)] = servico
+        return servico
+
+    async def exists_by_id(self, id: int, usuario_id: int) -> bool:
+        return (id, usuario_id) in self.servicos
+
+    async def exists_by_name(self, nome: str, usuario_id: int) -> bool:
+        return any(s.nome == nome and s.usuario_id == usuario_id for s in self.servicos.values())
+
+    async def count_projetos_ativos(self, servico_id: int, usuario_id: int) -> int:
+        return 0
+
+
+class InMemoryProjetoRepository(IProjetoRepository):
+    def __init__(self):
+        self.projetos = []
+
+    async def soft_delete(self, id: int, usuario_id: int) -> bool:
+        for p in self.projetos:
+            if p.id == id and p.usuario_id == usuario_id:
+                p.deletado_em = date.today()
+                return True
+        return False
+
+    async def get_with_names(self, projeto_id: int, usuario_id: int):
+        return None
+
+    async def list_with_names(self, usuario_id: int, cliente_id: int | None = None) -> list:
+        return []
+
+    async def soft_delete_pagamentos(self, projeto_id: int, usuario_id: int) -> None:
+        pass
+
+    async def get_by_id(self, id: int, usuario_id: int) -> ProjetoEntity | None:
+        for p in self.projetos:
+            if p.id == id and p.usuario_id == usuario_id:
+                return p
+        return None
+
+    async def list_by_usuario(self, usuario_id: int, cliente_id: int | None = None) -> list[ProjetoEntity]:
+        result = [p for p in self.projetos if p.usuario_id == usuario_id]
+        if cliente_id is not None:
+            result = [p for p in result if p.cliente_id == cliente_id]
+        return result
+
+    async def save(self, projeto: ProjetoEntity) -> ProjetoEntity:
+        if projeto.id is None:
+            projeto.id = len(self.projetos) + 1
+        else:
+            self.projetos = [p for p in self.projetos if p.id != projeto.id]
+        self.projetos.append(projeto)
+        return projeto
+
+    async def exists_active_contract(self, cliente_id: int, servico_id: int, exclude_id: int | None = None) -> bool:
+        for p in self.projetos:
+            if p.id == exclude_id:
+                continue
+            if p.cliente_id == cliente_id and p.servico_id == servico_id and p.deletado_em is None and p.recorrencia_ativa:
+                return True
+        return False
+
+    async def list_recorrentes_ativos(self, usuario_id: int) -> list[ProjetoEntity]:
+        return [p for p in self.projetos if p.usuario_id == usuario_id and p.tipo_recorrencia == 'MENSAL' and p.recorrencia_ativa]
+
+
+class InMemoryPagamentoRepository(IPagamentoRepository):
+    def __init__(self):
+        self.pagamentos = []
+
+    async def get_by_id(self, id: int, usuario_id: int) -> PagamentoEntity | None:
+        for pag in self.pagamentos:
+            if pag.id == id:
+                return pag
+        return None
+
+    async def save(self, pagamento: PagamentoEntity) -> PagamentoEntity:
+        if pagamento.id is None:
+            pagamento.id = len(self.pagamentos) + 1
+        else:
+            self.pagamentos = [p for p in self.pagamentos if p.id != pagamento.id]
+        self.pagamentos.append(pagamento)
+        return pagamento
+
+    async def list_with_names(self, usuario_id: int) -> list:
+        return []
+
+    async def exists_by_referencia(self, projeto_id: int, referencia_mes: str) -> bool:
+        for pag in self.pagamentos:
+            if pag.projeto_id == projeto_id and pag.referencia_mes == referencia_mes:
+                return True
+        return False
+
+    async def sum_recebido_mes(self, usuario_id: int, ano: int, mes: int) -> Decimal:
+        return Decimal("0.00")
+
+    async def count_recebido_mes(self, usuario_id: int, ano: int, mes: int) -> int:
+        return 0
+
+
+class InMemoryEventPublisher(IEventPublisher):
+    def __init__(self):
+        self.events = []
+
+    async def publish(self, usuario_id: int, routing_key: str, action: str, meta: dict | None = None) -> None:
+        self.events.append({
+            'usuario_id': usuario_id,
+            'routing_key': routing_key,
+            'action': action,
+            'meta': meta
+        })
+
+# --- TESTES ---
+
+@pytest.mark.asyncio
+async def test_criar_projeto_use_case_success():
+    cliente_repo = InMemoryClienteRepository()
+    servico_repo = InMemoryServicoRepository()
+    projeto_repo = InMemoryProjetoRepository()
+    event_pub = InMemoryEventPublisher()
+
+    # Prepara dados
+    await cliente_repo.save(ClienteEntity(id=1, usuario_id=10, nome="Cliente A"))
+    await servico_repo.save(ServicoEntity(id=2, usuario_id=10, nome="Servico B"))
+
+    use_case = CriarProjetoUseCase(projeto_repo, cliente_repo, servico_repo, event_pub)
+
+    projeto = await use_case.execute(
+        usuario_id=10,
+        cliente_id=1,
+        servico_id=2,
+        valor=Decimal("2000.00"),
+        tipo_recorrencia='MENSAL',
+        valor_mensal=Decimal("500.00"),
+        dia_vencimento=5
+    )
+
+    assert projeto.id == 1
+    assert projeto.usuario_id == 10
+    assert projeto.valor == Decimal("2000.00")
+    assert projeto.mensalista is True
+    assert len(event_pub.events) == 1
+    assert event_pub.events[0]['action'] == 'created'
+
+
+@pytest.mark.asyncio
+async def test_criar_projeto_use_case_colisao():
+    cliente_repo = InMemoryClienteRepository()
+    servico_repo = InMemoryServicoRepository()
+    projeto_repo = InMemoryProjetoRepository()
+    event_pub = InMemoryEventPublisher()
+
+    await cliente_repo.save(ClienteEntity(id=1, usuario_id=10, nome="Cliente A"))
+    await servico_repo.save(ServicoEntity(id=2, usuario_id=10, nome="Servico B"))
+
+    # Salva projeto ativo anterior
+    await projeto_repo.save(ProjetoEntity(usuario_id=10, cliente_id=1, servico_id=2, recorrencia_ativa=True))
+
+    use_case = CriarProjetoUseCase(projeto_repo, cliente_repo, servico_repo, event_pub)
+
+    with pytest.raises(ColisaoContratoException):
+        await use_case.execute(
+            usuario_id=10,
+            cliente_id=1,
+            servico_id=2
+        )
+
+
+@pytest.mark.asyncio
+async def test_faturar_recorrencias_use_case():
+    projeto_repo = InMemoryProjetoRepository()
+    pagamento_repo = InMemoryPagamentoRepository()
+    event_pub = InMemoryEventPublisher()
+
+    # Prepara contratos mensalistas
+    # Projeto 1: Dia vencimento 5, elegível
+    await projeto_repo.save(ProjetoEntity(
+        id=1, usuario_id=10, cliente_id=1, servico_id=1,
+        tipo_recorrencia='MENSAL', recorrencia_ativa=True,
+        valor_mensal=Decimal("500.00"), dia_vencimento=5
+    ))
+    # Projeto 2: Dia vencimento 28, NÃO elegível (hoje é dia 15)
+    await projeto_repo.save(ProjetoEntity(
+        id=2, usuario_id=10, cliente_id=1, servico_id=2,
+        tipo_recorrencia='MENSAL', recorrencia_ativa=True,
+        valor_mensal=Decimal("1000.00"), dia_vencimento=28
+    ))
+
+    use_case = FaturarRecorrenciasUseCase(projeto_repo, pagamento_repo, event_pub)
+
+    # Executa simulando data 2026-05-15 (dia 15)
+    hoje = date(2026, 5, 15)
+    pagamentos = await use_case.execute(usuario_id=10, hoje=hoje)
+
+    assert len(pagamentos) == 1
+    assert pagamentos[0].projeto_id == 1
+    assert pagamentos[0].valor == Decimal("500.00")
+    assert pagamentos[0].referencia_mes == "2026-05"
+    assert len(event_pub.events) == 1

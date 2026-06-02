@@ -2,6 +2,12 @@ import { API_BASE_URL } from '../config'
 
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
+// ---------------------------------------------------------------------------
+// C6 FIX: O cliente HTTP nunca envia Authorization: Bearer.
+// Os tokens JWT ficam em cookies HTTP-Only gerenciados pelo BFF.
+// O navegador envia os cookies automaticamente via credentials: 'include'.
+// ---------------------------------------------------------------------------
+
 const normalizeBody = (body: unknown) => {
   if (!body || typeof body !== 'object') return undefined
   const form = new URLSearchParams()
@@ -52,7 +58,6 @@ export async function http<T>(
   path: string,
   options?: {
     method?: HttpMethod
-    token?: string | null
     body?: unknown
     query?: Record<string, string | number | undefined | null>
   },
@@ -68,11 +73,10 @@ export async function http<T>(
 
   const url = `${API_BASE_URL}${path}${query}`
   const headers: Record<string, string> = {}
-  if (options?.token) headers.Authorization = `Bearer ${options.token}`
 
   let body: BodyInit | undefined
   if (options?.body) {
-    if (method === 'PATCH' || method === 'PUT') {
+    if (method === 'POST' || method === 'PATCH' || method === 'PUT') {
       body = JSON.stringify(options.body)
       headers['Content-Type'] = 'application/json'
     } else {
@@ -85,6 +89,7 @@ export async function http<T>(
     method,
     headers,
     body,
+    credentials: 'include', // Envia cookies HTTP-Only automaticamente (gerenciados pelo BFF)
   })
 
   let data: unknown = null

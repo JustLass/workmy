@@ -117,19 +117,7 @@ export function AppLayout() {
             <span className="font-body-md">Serviços</span>
           </NavLink>
 
-          <NavLink
-            to="/pagamentos"
-            className={({ isActive }) =>
-              `flex items-center gap-md px-md py-sm rounded-xl transition-all duration-200 ${
-                isActive
-                  ? 'text-primary font-bold bg-primary-fixed/40'
-                  : 'text-on-surface-variant hover:text-primary hover:bg-primary-fixed/20'
-              }`
-            }
-          >
-            <span className="material-symbols-outlined">payments</span>
-            <span className="font-body-md">Financeiro</span>
-          </NavLink>
+
         </nav>
 
         <div className="mt-auto px-sm pt-xl border-t border-outline-variant/30 space-y-xs">

@@ -23,7 +23,7 @@ export function ClienteDetailPage() {
     projeto_id: '',
     valor: '',
     tipo_pagamento: 'AVULSO',
-    data: '',
+    data: new Date().toLocaleDateString('en-CA'),
     observacao: '',
   })
   const [comprovanteBase64, setComprovanteBase64] = useState<string>('')
@@ -346,7 +346,7 @@ export function ClienteDetailPage() {
         ...prev,
         valor: '',
         tipo_pagamento: 'AVULSO',
-        data: '',
+        data: new Date().toLocaleDateString('en-CA'),
         observacao: '',
       }))
       setComprovanteBase64('')

@@ -1,0 +1,131 @@
+# WorkMy — Docker Compose (ambiente de desenvolvimento + staging)
+# Uso: docker compose up -d
+# Logs: docker compose logs -f
+#
+# Serviços:
+#   postgres   — banco de dados relacional (PostgreSQL 15)
+#   rabbitmq   — broker de mensageria (RabbitMQ 3 + management UI)
+#   fastapi    — backend core (FastAPI + SQLAlchemy Async)
+#   bff        — proxy gateway Node.js (HTTP-Only cookies + JWT injection)
+
+version: '3.9'
+
+# ─── Rede interna ────────────────────────────────────────────────────────────
+networks:
+  workmy_net:
+    driver: bridge
+
+# ─── Volumes persistentes ─────────────────────────────────────────────────────
+volumes:
+  postgres_data:
+  rabbitmq_data:
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 1. Banco de dados relacional
+  # ──────────────────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: workmy_postgres
+    environment:
+      POSTGRES_USER: workmy_user
+      POSTGRES_PASSWORD: workmy_password
+      POSTGRES_DB: workmy_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - workmy_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U workmy_user -d workmy_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 2. Broker de mensageria
+  # ──────────────────────────────────────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: workmy_rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"       # AMQP (conexão do backend)
+      - "15672:15672"     # Management UI: http://localhost:15672
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - workmy_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 3. Backend FastAPI (Hexagonal Architecture)
+  # ──────────────────────────────────────────────────────────────────────────
+  fastapi:
+    build:
+      context: ./backend-fastapi
+      dockerfile: Dockerfile
+    container_name: workmy_fastapi
+    environment:
+      # Banco
+      DATABASE_URL: "postgresql+asyncpg://workmy_user:workmy_password@postgres:5432/workmy_db"
+      # JWT — OBRIGATÓRIO em produção. Gere com: python -c "import secrets; print(secrets.token_urlsafe(64))"
+      JWT_SECRET_KEY: "${JWT_SECRET_KEY:-dev_secret_change_me_in_production}"
+      # RabbitMQ
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672/"
+      # CORS — origens do BFF e do frontend (separados por vírgula)
+      CORS_ORIGINS: "http://localhost:3000,http://bff:3000"
+      # Logging — 'json' em produção, 'text' em desenvolvimento
+      LOG_FORMAT: "${LOG_FORMAT:-text}"
+    ports:
+      - "8000:8000"
+    networks:
+      - workmy_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # 4. BFF — Backend For Frontend (Node.js proxy gateway)
+  # ──────────────────────────────────────────────────────────────────────────
+  bff:
+    build:
+      context: ./frontend/bff
+      dockerfile: Dockerfile
+    container_name: workmy_bff
+    environment:
+      # URL do FastAPI (nome do serviço Docker, não localhost)
+      FASTAPI_URL: "http://fastapi:8000"
+      # CORS — origem do frontend React (Vite dev server ou domínio de produção)
+      CORS_ORIGIN: "${CORS_ORIGIN:-http://localhost:5173}"
+      PORT: "3000"
+      NODE_ENV: "${NODE_ENV:-development}"
+    ports:
+      - "3000:3000"
+    networks:
+      - workmy_net
+    depends_on:
+      fastapi:
+        condition: service_healthy
+    restart: unless-stopped

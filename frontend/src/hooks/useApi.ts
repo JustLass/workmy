@@ -1,6 +1,4 @@
 import { useAuth } from '../hooks/useAuth'
-import { IS_DEMO_MODE } from '../config'
-import { demoRequest } from '../demo/demoApi'
 import { http } from '../lib/http'
 import { useCallback } from 'react'
 import {
@@ -11,8 +9,14 @@ import {
   writeCache,
 } from '../shared/lib/cache'
 
+// ---------------------------------------------------------------------------
+// C6 FIX: useApi não passa mais 'token' para http().
+// Autenticação é feita via cookies HTTP-Only gerenciados pelo BFF.
+// O logout é chamado quando o BFF retorna 401 (sessão expirada).
+// ---------------------------------------------------------------------------
+
 export function useApi() {
-  const { accessToken, logout, user } = useAuth()
+  const { logout, user } = useAuth()
 
   const request = useCallback(
     async <T,>(
@@ -36,17 +40,12 @@ export function useApi() {
           if (cached !== null) return cached
         }
 
-        const response = IS_DEMO_MODE
-          ? await demoRequest<T>(path, {
-              method: method as 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
-              body: options?.body,
-              query: options?.query,
-            })
-          : await http<T>(path, {
-              ...options,
-              method,
-              token: accessToken,
-            })
+        // Sem passar 'token' — o browser envia os cookies automaticamente
+        const response = await http<T>(path, {
+          method,
+          body: options?.body,
+          query: options?.query,
+        })
 
         if (method === 'GET') {
           writeCache(cacheKey, response, options?.cacheTtlMs)
@@ -56,11 +55,12 @@ export function useApi() {
 
         return response
       } catch (error) {
+        // 401 do BFF = sessão expirada (refresh falhou) — força logout local
         if ((error as { status?: number }).status === 401) logout()
         throw error
       }
     },
-    [accessToken, logout, user?.id],
+    [logout, user?.id],
   )
 
   return { request }
