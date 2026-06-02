@@ -28,11 +28,22 @@ const FASTAPI_PROTOCOL = _fastapiParsed.protocol === 'https:' ? https : http;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173';
 const ALLOWED_ORIGINS = CORS_ORIGIN.split(',').map(o => o.trim()).filter(Boolean);
 
+// Em desenvolvimento, aceita qualquer origem localhost (qualquer porta do Vite)
+// Em produção, usa apenas a whitelist de CORS_ORIGIN
+const isLocalhostOrigin = (origin) =>
+    /^https?:\/\/localhost(:\d+)?$/.test(origin) ||
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(origin);
+
 app.use(cookieParser());
 app.use(cors({
     origin: (origin, callback) => {
         // Permite requests sem Origin (ex: curl, Postman, SSR)
         if (!origin) return callback(null, true);
+        // Dev: aceita qualquer localhost independente da porta
+        if (!IS_PRODUCTION && isLocalhostOrigin(origin)) {
+            return callback(null, true);
+        }
+        // Produção: apenas origens da whitelist
         if (ALLOWED_ORIGINS.includes(origin)) {
             return callback(null, true);
         }
