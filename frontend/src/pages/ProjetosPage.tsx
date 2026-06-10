@@ -93,31 +93,6 @@ export function ProjetosPage() {
     }
   }
 
-  const updateStatus = async (id: number, status: StatusType) => {
-    const snapshot = items
-    setItems((prev) =>
-      prev.map((item) => {
-        if (item.id === id) {
-          return {
-            ...item,
-            status,
-            progresso: status === 'COMPLETED' ? 100 : item.progresso,
-          }
-        }
-        return item
-      })
-    )
-
-    try {
-      await request(`/projetos/${id}/status`, {
-        method: 'PATCH',
-        body: { status },
-      })
-    } catch (err) {
-      setItems(snapshot)
-      setError(err instanceof ApiError ? err.message : 'Erro ao atualizar status do projeto')
-    }
-  }
 
   const handleEditClick = (item: Projeto) => {
     setEditingItem(item)
@@ -254,7 +229,6 @@ export function ProjetosPage() {
                   <th className="px-lg py-md font-semibold">Projeto / Serviço</th>
                   <th className="px-lg py-md font-semibold">Cliente</th>
                   <th className="px-lg py-md font-semibold">Total Recebido</th>
-                  <th className="px-lg py-md font-semibold">Status</th>
                   <th className="px-lg py-md font-semibold">Recorrência</th>
                   <th className="px-lg py-md font-semibold text-right">Ações</th>
                 </tr>
@@ -264,11 +238,6 @@ export function ProjetosPage() {
                   <tr key={item.id} className="hover:bg-primary-fixed/5 transition-all">
                     <td className="px-lg py-lg">
                       <div className="flex items-center gap-md">
-                        <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${
-                          item.status === 'COMPLETED' ? 'bg-secondary' :
-                          item.status === 'REVIEW' ? 'bg-tertiary-container' :
-                          item.status === 'IN_PROGRESS' ? 'bg-primary' : 'bg-outline'
-                        }`} />
                         <span className="font-bold text-on-surface hover:underline">
                           <Link to={`/clientes/${item.cliente_id}`}>{item.servico_nome}</Link>
                         </span>
@@ -279,18 +248,6 @@ export function ProjetosPage() {
                     </td>
                     <td className="px-lg py-lg text-primary font-mono-data font-semibold">
                       {formatMoney(item.total_acumulado)}
-                    </td>
-                    <td className="px-lg py-lg">
-                      <select
-                        value={item.status}
-                        onChange={(e) => updateStatus(item.id, e.target.value as StatusType)}
-                        className="bg-surface-container border border-outline-variant/30 rounded-lg py-xs px-sm text-xs font-semibold text-on-surface outline-none cursor-pointer hover:border-primary transition-all"
-                      >
-                        <option value="DISCOVERY">Descoberta</option>
-                        <option value="IN_PROGRESS">Em Progresso</option>
-                        <option value="REVIEW">Revisão</option>
-                        <option value="COMPLETED">Concluído</option>
-                      </select>
                     </td>
                     <td className="px-lg py-lg">
                       <div
@@ -399,19 +356,6 @@ export function ProjetosPage() {
                 Cobrança Recorrente Mensal
               </label>
 
-              <label className="block text-sm font-semibold text-outline mt-sm">
-                Valor do Contrato (R$, opcional)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Ex: 1500.00"
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
-                  value={form.valor}
-                  onChange={(e) => setForm((prev) => ({ ...prev, valor: e.target.value }))}
-                />
-              </label>
-
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>
                 <button
                   type="button"
@@ -454,20 +398,6 @@ export function ProjetosPage() {
             </p>
 
             <form className="form-grid" onSubmit={onUpdateProject} style={{ gridTemplateColumns: '1fr', gap: '14px' }}>
-              <label className="block text-sm font-semibold text-outline">
-                Status do Projeto
-                <select
-                  value={editForm.status}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, status: e.target.value as StatusType }))}
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none"
-                >
-                  <option value="DISCOVERY">Discovery</option>
-                  <option value="IN_PROGRESS">Em Progresso</option>
-                  <option value="REVIEW">Revisão</option>
-                  <option value="COMPLETED">Concluído</option>
-                </select>
-              </label>
-
               <label className="flex items-center gap-xs font-semibold text-outline cursor-pointer mt-md select-none">
                 <input
                   type="checkbox"
@@ -482,19 +412,6 @@ export function ProjetosPage() {
                   className="rounded border-outline/20 text-primary focus:ring-primary w-5 h-5"
                 />
                 Cobrança Recorrente Mensal
-              </label>
-
-              <label className="block text-sm font-semibold text-outline mt-sm">
-                Valor do Contrato (R$, opcional)
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Ex: 1500.00"
-                  className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
-                  value={editForm.valor}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, valor: e.target.value }))}
-                />
               </label>
 
               <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', marginTop: '12px' }}>

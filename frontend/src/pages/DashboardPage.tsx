@@ -1020,8 +1020,8 @@ export function DashboardPage() {
               </label>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-md">
-                <label className="block text-sm font-semibold text-outline">
-                  Tags (Separadas por vírgula)
+                <label className="flex flex-col justify-between h-full text-sm font-semibold text-outline">
+                  <span>Tags (Separadas por vírgula)</span>
                   <input
                     className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
                     value={serviceForm.tags}
@@ -1029,8 +1029,8 @@ export function DashboardPage() {
                   />
                 </label>
 
-                <label className="block text-sm font-semibold text-outline">
-                  Ferramentas (Separadas por vírgula)
+                <label className="flex flex-col justify-between h-full text-sm font-semibold text-outline">
+                  <span>Ferramentas (Separadas por vírgula)</span>
                   <input
                     className="mt-1 w-full bg-surface-container-lowest border border-outline/20 rounded-xl py-sm px-md font-body-md focus:border-primary outline-none text-on-surface"
                     value={serviceForm.ferramentas}
